@@ -1,0 +1,14 @@
+# requirements.txt - UPDATED with specific compatible versions
+Flask==2.3.3
+Flask-SQLAlchemy==3.0.5
+Flask-CORS==4.0.0
+Flask-SocketIO==5.3.6
+python-socketio==5.8.0
+Werkzeug==2.3.7
+python-dotenv==1.0.0
+click==8.1.7
+requests==2.31.0
+
+# Claude API - use compatible version
+anthropic==0.25.1
+tiktoken==0.5.2

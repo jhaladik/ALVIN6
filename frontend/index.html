@@ -1,0 +1,1399 @@
+<!DOCTYPE html>
+<html lang="cs">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>StoryForge AI - Scene-Object-Story Platform</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        .gradient-bg { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); }
+        .glass { backdrop-filter: blur(10px); background: rgba(255, 255, 255, 0.1); }
+        .scene-node { 
+            transition: all 0.3s ease; 
+            cursor: pointer;
+            position: relative;
+        }
+        .scene-node:hover { 
+            transform: scale(1.02); 
+            box-shadow: 0 10px 25px rgba(0,0,0,0.1);
+        }
+        .scene-node.active {
+            border: 2px solid #667eea;
+            box-shadow: 0 0 20px rgba(102, 126, 234, 0.3);
+        }
+        .object-tag { 
+            transition: all 0.2s ease;
+            cursor: pointer;
+        }
+        .object-tag:hover { 
+            transform: scale(1.05);
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+        }
+        .workflow-phase {
+            transition: all 0.3s ease;
+            border-radius: 12px;
+        }
+        .workflow-phase.active {
+            background: linear-gradient(135deg, #667eea, #764ba2);
+            color: white;
+            transform: scale(1.05);
+        }
+        .ai-thinking { animation: pulse 2s infinite; }
+        @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.5; } }
+        .ripple-effect {
+            animation: ripple 0.6s ease-out;
+        }
+        @keyframes ripple {
+            0% { transform: scale(1); box-shadow: 0 0 0 0 rgba(102, 126, 234, 0.7); }
+            70% { transform: scale(1.05); box-shadow: 0 0 0 10px rgba(102, 126, 234, 0); }
+            100% { transform: scale(1); box-shadow: 0 0 0 0 rgba(102, 126, 234, 0); }
+        }
+        .offline-indicator {
+            animation: blink 2s infinite;
+        }
+        @keyframes blink {
+            0%, 50% { opacity: 1; }
+            51%, 100% { opacity: 0.5; }
+        }
+    </style>
+</head>
+<body class="bg-gradient-to-br from-slate-50 to-blue-50 min-h-screen">
+    
+    <!-- Connection Status Banner -->
+    <div id="connection-banner" class="hidden bg-red-500 text-white text-center py-2 text-sm">
+        <span class="offline-indicator">⚠️ Připojení k serveru selhalo. Zkontrolujte, zda běží Flask aplikace na portu 5000.</span>
+        <button onclick="retryConnection()" class="ml-4 underline">Zkusit znovu</button>
+    </div>
+
+    <!-- Login Modal -->
+    <div id="login-modal" class="hidden fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+        <div class="bg-white rounded-2xl shadow-2xl p-8 w-full max-w-md mx-4">
+            <div class="text-center mb-6">
+                <h2 class="text-2xl font-bold text-gray-800 mb-2">🎭 StoryForge AI</h2>
+                <p class="text-gray-600">Přihlaste se pro pokračování</p>
+            </div>
+            
+            <form id="login-form" class="space-y-4">
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Email</label>
+                    <input type="email" id="login-email" value="demo@storyforge.ai" 
+                           class="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500" required>
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Heslo</label>
+                    <input type="password" id="login-password" value="demo123"
+                           class="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500" required>
+                </div>
+                <button type="submit" id="login-button" class="w-full bg-blue-500 text-white py-3 rounded-lg hover:bg-blue-600 transition-all">
+                    Přihlásit se
+                </button>
+            </form>
+            
+            <div id="login-error" class="hidden mt-4 p-3 bg-red-50 border border-red-200 rounded-lg">
+                <p class="text-red-700 text-sm"></p>
+            </div>
+            
+            <div class="mt-4 text-center text-sm text-gray-600">
+                <p>Demo účet: demo@storyforge.ai / demo123</p>
+                <p class="mt-2 text-xs">
+                    <a href="#" onclick="showServerHelp()" class="text-blue-600 hover:underline">
+                        Problémy s připojením? 🔧
+                    </a>
+                </p>
+            </div>
+        </div>
+    </div>
+
+    <!-- Server Help Modal -->
+    <div id="server-help-modal" class="hidden fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+        <div class="bg-white rounded-2xl shadow-2xl p-8 w-full max-w-2xl mx-4 max-h-96 overflow-y-auto">
+            <div class="flex items-center justify-between mb-4">
+                <h3 class="text-xl font-bold text-gray-800">🔧 Řešení problémů</h3>
+                <button onclick="hideServerHelp()" class="text-gray-500 hover:text-gray-700">✕</button>
+            </div>
+            
+            <div class="space-y-4 text-sm">
+                <div class="bg-blue-50 p-4 rounded-lg">
+                    <h4 class="font-medium text-blue-800 mb-2">1. Zkontrolujte Flask server</h4>
+                    <p class="text-blue-700">Ujistěte se, že běží Flask aplikace:</p>
+                    <code class="block mt-2 p-2 bg-blue-100 rounded">python run.py</code>
+                    <p class="text-blue-700 mt-1">Server by měl běžet na http://localhost:5000</p>
+                </div>
+                
+                <div class="bg-yellow-50 p-4 rounded-lg">
+                    <h4 class="font-medium text-yellow-800 mb-2">2. Zkontrolujte databázi</h4>
+                    <p class="text-yellow-700">Pokud se zobrazuje 500 error, možná chybí databáze:</p>
+                    <code class="block mt-2 p-2 bg-yellow-100 rounded">flask init-db-command</code>
+                </div>
+                
+                <div class="bg-green-50 p-4 rounded-lg">
+                    <h4 class="font-medium text-green-800 mb-2">3. Testovací odkazy</h4>
+                    <div class="space-y-1">
+                        <a href="/health" target="_blank" class="block text-green-700 hover:underline">
+                            → Health check (/health)
+                        </a>
+                        <a href="/api" target="_blank" class="block text-green-700 hover:underline">
+                            → API info (/api)
+                        </a>
+                    </div>
+                </div>
+                
+                <div class="bg-red-50 p-4 rounded-lg">
+                    <h4 class="font-medium text-red-800 mb-2">4. Časté chyby</h4>
+                    <ul class="text-red-700 space-y-1">
+                        <li>• <strong>CORS error:</strong> Restartujte Flask server</li>
+                        <li>• <strong>500 error:</strong> Zkontrolujte konzoli Flask serveru</li>
+                        <li>• <strong>404 error:</strong> Ujistěte se, že běží na portu 5000</li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Header -->
+    <header class="gradient-bg text-white shadow-xl relative overflow-hidden">
+        <div class="absolute inset-0 bg-black opacity-10"></div>
+        <div class="relative max-w-7xl mx-auto px-6 py-4">
+            <div class="flex items-center justify-between">
+                <div class="flex items-center space-x-4">
+                    <div class="flex items-center space-x-3">
+                        <span class="text-3xl">🎭</span>
+                        <h1 class="text-2xl font-bold">StoryForge AI</h1>
+                        <span class="text-sm bg-white bg-opacity-20 px-2 py-1 rounded-full">Scene-Object-Story</span>
+                    </div>
+                </div>
+                
+                <div class="flex items-center space-x-4">
+                    <!-- Connection Status -->
+                    <div id="connection-status" class="text-xs bg-white bg-opacity-20 px-2 py-1 rounded-full">
+                        <span id="connection-indicator">🔄 Připojuji...</span>
+                    </div>
+                    
+                    <!-- Token Usage -->
+                    <div class="hidden sm:block" id="token-display" style="display: none;">
+                        <div class="flex items-center space-x-2 bg-white bg-opacity-20 rounded-full px-3 py-1">
+                            <span class="text-xs">🔋</span>
+                            <div class="w-16 h-2 bg-white bg-opacity-30 rounded-full overflow-hidden">
+                                <div id="token-meter" class="h-full bg-green-400 transition-all" style="width: 0%"></div>
+                            </div>
+                            <span class="text-xs" id="token-count">0/0</span>
+                        </div>
+                    </div>
+                    
+                    <!-- User Info -->
+                    <div class="text-sm bg-white bg-opacity-20 px-3 py-1 rounded-full" id="user-display" style="display: none;">
+                        <span id="user-info">Načítám...</span>
+                    </div>
+                    <button onclick="logout()" class="text-sm bg-white bg-opacity-20 px-3 py-1 rounded-full hover:bg-opacity-30" id="logout-button" style="display: none;">
+                        Odhlásit
+                    </button>
+                </div>
+            </div>
+        </div>
+    </header>
+
+    <div class="max-w-7xl mx-auto p-6 space-y-6">
+        
+        <!-- Project Selection -->
+        <div class="bg-white rounded-xl shadow-lg p-6">
+            <div class="flex items-center justify-between mb-4">
+                <div>
+                    <h2 class="text-2xl font-bold text-gray-800">Aktuální projekt</h2>
+                    <p class="text-gray-600" id="current-project-title">Inicializuji aplikaci...</p>
+                </div>
+                <div class="flex space-x-3">
+                    <button onclick="createNewProject()" class="bg-blue-500 text-white px-4 py-2 rounded-lg hover:bg-blue-600 disabled:opacity-50" disabled id="new-project-btn">
+                        ➕ Nový projekt
+                    </button>
+                    <button onclick="showProjectList()" class="bg-gray-500 text-white px-4 py-2 rounded-lg hover:bg-gray-600 disabled:opacity-50" disabled id="show-projects-btn">
+                        📂 Všechny projekty
+                    </button>
+                </div>
+            </div>
+            
+            <!-- Project Stats -->
+            <div class="grid grid-cols-2 md:grid-cols-5 gap-4 text-center" id="project-stats">
+                <div class="bg-blue-50 rounded-lg p-3">
+                    <div class="text-2xl font-bold text-blue-600" id="stat-outlines">-</div>
+                    <div class="text-sm text-gray-600">Osnova</div>
+                </div>
+                <div class="bg-green-50 rounded-lg p-3">
+                    <div class="text-2xl font-bold text-green-600" id="stat-scenes">-</div>
+                    <div class="text-sm text-gray-600">Scény</div>
+                </div>
+                <div class="bg-yellow-50 rounded-lg p-3">
+                    <div class="text-2xl font-bold text-yellow-600" id="stat-objects">-</div>
+                    <div class="text-sm text-gray-600">Objekty</div>
+                </div>
+                <div class="bg-purple-50 rounded-lg p-3">
+                    <div class="text-2xl font-bold text-purple-600" id="stat-words">-</div>
+                    <div class="text-sm text-gray-600">Slov</div>
+                </div>
+                <div class="bg-pink-50 rounded-lg p-3">
+                    <div class="text-2xl font-bold text-pink-600" id="stat-phase">-</div>
+                    <div class="text-sm text-gray-600">Fáze</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Workflow Phases -->
+        <div class="bg-white rounded-2xl shadow-lg p-6">
+            <h2 class="text-xl font-bold mb-4 flex items-center gap-2">
+                <span class="text-2xl">🔄</span>
+                Workflow Phases
+            </h2>
+            <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
+                <div id="phase-idea" class="workflow-phase p-4 bg-gray-50 border-2 border-gray-200 text-center cursor-pointer" onclick="setPhase('idea')">
+                    <div class="text-2xl mb-2">💡</div>
+                    <div class="font-medium">Nápad → Scéna</div>
+                    <div class="text-xs text-gray-600">Začínáme</div>
+                </div>
+                <div id="phase-expand" class="workflow-phase p-4 bg-gray-50 border-2 border-gray-200 text-center cursor-pointer active" onclick="setPhase('expand')">
+                    <div class="text-2xl mb-2">🎬</div>
+                    <div class="font-medium">Expanze scén</div>
+                    <div class="text-xs text-gray-400">Objekty → Nové scény</div>
+                </div>
+                <div id="phase-story" class="workflow-phase p-4 bg-gray-50 border-2 border-gray-200 text-center cursor-pointer" onclick="setPhase('story')">
+                    <div class="text-2xl mb-2">📖</div>
+                    <div class="font-medium">Generace příběhu</div>
+                    <div class="text-xs text-gray-600">Scény → Příběh</div>
+                </div>
+                <div id="phase-literary" class="workflow-phase p-4 bg-gray-50 border-2 border-gray-200 text-center cursor-pointer" onclick="setPhase('literary')">
+                    <div class="text-2xl mb-2">📚</div>
+                    <div class="font-medium">Literární dílo</div>
+                    <div class="text-xs text-gray-600">Granular generation</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Main Content Grid -->
+        <div class="grid grid-cols-1 xl:grid-cols-4 gap-6">
+            
+            <!-- Scene Timeline (Left Panel) -->
+            <div class="xl:col-span-2 space-y-6">
+                
+                <!-- AI Scene Detective -->
+                <div class="bg-gradient-to-r from-indigo-50 to-purple-50 rounded-2xl p-5 border border-indigo-200">
+                    <div class="flex items-start space-x-4">
+                        <div class="bg-indigo-500 rounded-full p-3 flex-shrink-0">
+                            <span class="text-white text-lg">🕵️</span>
+                        </div>
+                        <div class="flex-1">
+                            <div class="flex items-center justify-between mb-2">
+                                <h4 class="font-bold text-indigo-800">Scene Detective AI</h4>
+                                <div class="flex items-center space-x-2">
+                                    <span id="ai-status" class="text-xs bg-gray-100 text-gray-800 px-2 py-1 rounded">Offline</span>
+                                    <span class="text-xs bg-indigo-100 text-indigo-800 px-2 py-1 rounded">Claude</span>
+                                </div>
+                            </div>
+                            <p id="ai-message" class="text-indigo-700 text-sm mb-3">
+                                Čekám na připojení k serveru...
+                            </p>
+                            <div class="flex flex-wrap gap-2">
+                                <button onclick="aiAnalyzeStructure()" class="px-3 py-1.5 bg-indigo-500 text-white rounded-full text-sm hover:bg-indigo-600 transition-all disabled:opacity-50" disabled id="ai-analyze-btn">
+                                    🔍 Analyzovat strukturu
+                                </button>
+                                <button onclick="aiSuggestScenes()" class="px-3 py-1.5 bg-blue-500 text-white rounded-full text-sm hover:bg-blue-600 transition-all disabled:opacity-50" disabled id="ai-suggest-btn">
+                                    ➕ Navrhnout scény
+                                </button>
+                                <button onclick="aiGenerateStory()" class="px-3 py-1.5 bg-green-500 text-white rounded-full text-sm hover:bg-green-600 transition-all disabled:opacity-50" disabled id="ai-generate-btn">
+                                    📖 Generovat příběh
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Scene Input -->
+                <div class="bg-white rounded-2xl shadow-lg p-6">
+                    <h3 class="text-xl font-bold mb-4 flex items-center gap-2">
+                        <span class="text-2xl">✍️</span>
+                        Nová scéna
+                    </h3>
+                    
+                    <div class="space-y-4">
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-2">Název scény</label>
+                            <input type="text" id="scene-title" placeholder="Například: Objevení tajemství..." 
+                                   class="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500" disabled>
+                        </div>
+                        
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-2">Popis scény</label>
+                            <textarea id="scene-description" rows="4"
+                                      placeholder="Popište co se ve scéně děje. AI automaticky rozpozná postavy, objekty a lokace..."
+                                      class="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500" disabled></textarea>
+                        </div>
+                        
+                        <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                            <div>
+                                <label class="block text-sm font-medium text-gray-700 mb-1">Typ scény</label>
+                                <select id="scene-type" class="w-full p-2 border border-gray-300 rounded-lg" disabled>
+                                    <option value="inciting">Inciting incident</option>
+                                    <option value="development" selected>Development</option>
+                                    <option value="rising_action">Rising action</option>
+                                    <option value="climax">Climax</option>
+                                    <option value="resolution">Resolution</option>
+                                </select>
+                            </div>
+                            <div>
+                                <label class="block text-sm font-medium text-gray-700 mb-1">Lokace</label>
+                                <input type="text" id="scene-location" placeholder="Kde se scéna odehrává"
+                                       class="w-full p-2 border border-gray-300 rounded-lg" disabled>
+                            </div>
+                            <div>
+                                <label class="block text-sm font-medium text-gray-700 mb-1">Konflikt</label>
+                                <input type="text" id="scene-conflict" placeholder="Hlavní konflikt scény"
+                                       class="w-full p-2 border border-gray-300 rounded-lg" disabled>
+                            </div>
+                        </div>
+                        
+                        <button onclick="createScene()" class="w-full bg-blue-500 text-white py-3 rounded-lg hover:bg-blue-600 transition-all disabled:opacity-50" disabled id="create-scene-btn">
+                            🎬 Vytvořit scénu (5 tokenů)
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Scene Timeline -->
+                <div class="bg-white rounded-2xl shadow-lg p-6">
+                    <div class="flex items-center justify-between mb-6">
+                        <h3 class="text-xl font-bold flex items-center gap-2">
+                            <span class="text-2xl">🎬</span>
+                            Scene Timeline
+                        </h3>
+                        <div class="text-sm text-gray-600" id="scene-count-display">- scén</div>
+                    </div>
+                    
+                    <div id="scene-timeline" class="space-y-4">
+                        <div class="text-center text-gray-500 py-12">
+                            <span class="text-4xl mb-4 block">🔄</span>
+                            <p class="text-lg mb-2">Inicializuji aplikaci...</p>
+                            <p class="text-sm">Připojuji se k serveru</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Right Panels -->
+            <div class="xl:col-span-2 space-y-6">
+                
+                <!-- Project List -->
+                <div class="bg-white rounded-2xl shadow-lg p-6">
+                    <h3 class="text-lg font-bold mb-4 flex items-center gap-2">
+                        <span class="text-xl">📂</span>
+                        Projekty
+                    </h3>
+                    
+                    <div id="projects-list" class="space-y-2">
+                        <div class="text-center text-gray-500 py-8">
+                            <span class="text-3xl mb-2 block">🔄</span>
+                            <p class="text-sm">Načítám projekty...</p>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Object Universe -->
+                <div class="bg-white rounded-2xl shadow-lg p-6">
+                    <h3 class="text-lg font-bold mb-4 flex items-center gap-2">
+                        <span class="text-xl">🌐</span>
+                        Object Universe
+                    </h3>
+                    
+                    <div id="objects-container" class="space-y-4">
+                        <div class="text-center text-gray-500 py-8">
+                            <span class="text-3xl mb-2 block">🔄</span>
+                            <p class="text-sm">Načítám objekty...</p>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- AI Analysis -->
+                <div class="bg-white rounded-2xl shadow-lg p-6">
+                    <h3 class="text-lg font-bold mb-4 flex items-center gap-2">
+                        <span class="text-xl">🧠</span>
+                        AI Analýza
+                    </h3>
+                    
+                    <div id="ai-analysis" class="space-y-4">
+                        <div class="text-center text-gray-500 py-8">
+                            <span class="text-3xl mb-2 block">🔄</span>
+                            <p class="text-sm">Čekám na připojení...</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Loading Overlay -->
+    <div id="loading-overlay" class="hidden fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+        <div class="bg-white rounded-2xl p-8 flex items-center space-x-4">
+            <div class="animate-spin rounded-full h-10 w-10 border-b-2 border-indigo-600"></div>
+            <span class="text-gray-700 font-medium text-lg" id="loading-message">Načítám...</span>
+        </div>
+    </div>
+
+    <!-- Toast Notifications -->
+    <div id="toast-container" class="fixed top-4 right-4 z-50 space-y-2"></div>
+
+    <script>
+        // Enhanced API Client with better error handling
+        class StoryForgeAPI {
+            constructor(baseURL = '/api') {
+                this.baseURL = baseURL;
+                this.isOnline = false;
+                this.retryCount = 0;
+                this.maxRetries = 3;
+            }
+
+            async request(endpoint, options = {}) {
+                const url = `${this.baseURL}${endpoint}`;
+                const config = {
+                    headers: {
+                        'Content-Type': 'application/json',
+                        ...options.headers,
+                    },
+                    credentials: 'include',
+                    timeout: 10000, // 10 second timeout
+                    ...options,
+                };
+
+                if (options.body && typeof options.body === 'object') {
+                    config.body = JSON.stringify(options.body);
+                }
+
+                for (let attempt = 0; attempt <= this.maxRetries; attempt++) {
+                    try {
+                        const controller = new AbortController();
+                        const timeoutId = setTimeout(() => controller.abort(), 10000);
+                        
+                        const response = await fetch(url, {
+                            ...config,
+                            signal: controller.signal
+                        });
+                        
+                        clearTimeout(timeoutId);
+                        
+                        if (!response.ok) {
+                            const errorData = await response.json().catch(() => ({}));
+                            throw new Error(errorData.error || `HTTP ${response.status}`);
+                        }
+
+                        const data = await response.json();
+                        this.isOnline = true;
+                        updateConnectionStatus(true);
+                        return data;
+
+                    } catch (error) {
+                        console.error(`API Request failed (attempt ${attempt + 1}):`, error);
+                        
+                        if (attempt === this.maxRetries) {
+                            this.isOnline = false;
+                            updateConnectionStatus(false);
+                            
+                            if (error.name === 'AbortError') {
+                                throw new Error('Požadavek vypršel. Zkontrolujte připojení k serveru.');
+                            } else if (error.message.includes('Failed to fetch')) {
+                                throw new Error('Server není dostupný. Ujistěte se, že Flask aplikace běží na portu 5000.');
+                            } else {
+                                throw error;
+                            }
+                        }
+                        
+                        // Wait before retry
+                        await new Promise(resolve => setTimeout(resolve, 1000 * (attempt + 1)));
+                    }
+                }
+            }
+
+            // Health check method
+            async healthCheck() {
+                try {
+                    // Health endpoint is at root level, not under /api
+                    const response = await fetch('/health', {
+                        method: 'GET',
+                        credentials: 'include'
+                    });
+                    return response.ok;
+                } catch (error) {
+                    console.warn('Health check failed:', error.message);
+                    return false;
+                }
+            }
+
+            // Auth methods
+            async login(email, password) {
+                return this.request('/auth/login', {
+                    method: 'POST',
+                    body: { email, password }
+                });
+            }
+
+            async logout() {
+                return this.request('/auth/logout', { method: 'POST' });
+            }
+
+            async getCurrentUser() {
+                return this.request('/auth/me');
+            }
+
+            // Project methods
+            async getProjects() {
+                return this.request('/projects');
+            }
+
+            async createProject(projectData) {
+                return this.request('/projects', {
+                    method: 'POST',
+                    body: projectData
+                });
+            }
+
+            async getProject(projectId) {
+                return this.request(`/projects/${projectId}`);
+            }
+
+            // Scene methods
+            async createScene(sceneData) {
+                return this.request('/scenes', {
+                    method: 'POST',
+                    body: sceneData
+                });
+            }
+
+            async updateScene(sceneId, sceneData) {
+                return this.request(`/scenes/${sceneId}`, {
+                    method: 'PUT',
+                    body: sceneData
+                });
+            }
+
+            async deleteScene(sceneId) {
+                return this.request(`/scenes/${sceneId}`, {
+                    method: 'DELETE'
+                });
+            }
+
+            // AI methods
+            async analyzeStructure(projectId) {
+                return this.request(`/ai/projects/${projectId}/analyze-structure`, {
+                    method: 'POST'
+                });
+            }
+
+            async suggestScenes(projectId) {
+                return this.request(`/ai/projects/${projectId}/suggest-scenes`, {
+                    method: 'POST'
+                });
+            }
+        }
+
+        // Global State
+        const api = new StoryForgeAPI();
+        let currentUser = null;
+        let currentProject = null;
+        let currentProjectData = null;
+        let currentPhase = 'expand';
+        let isAuthenticated = false;
+        let isInitialized = false;
+
+        // DOM Elements
+        const loginModal = document.getElementById('login-modal');
+        const loginForm = document.getElementById('login-form');
+        const loginError = document.getElementById('login-error');
+        const connectionBanner = document.getElementById('connection-banner');
+        const connectionStatus = document.getElementById('connection-status');
+        const connectionIndicator = document.getElementById('connection-indicator');
+        const userInfo = document.getElementById('user-info');
+        const loadingOverlay = document.getElementById('loading-overlay');
+        const loadingMessage = document.getElementById('loading-message');
+        const tokenMeter = document.getElementById('token-meter');
+        const tokenCount = document.getElementById('token-count');
+
+        // Utility Functions
+        function updateConnectionStatus(isOnline) {
+            if (isOnline) {
+                connectionIndicator.textContent = '🟢 Online';
+                connectionIndicator.className = 'text-green-100';
+                connectionBanner.classList.add('hidden');
+                document.getElementById('ai-status').textContent = 'Online';
+                document.getElementById('ai-status').className = 'text-xs bg-green-100 text-green-800 px-2 py-1 rounded';
+            } else {
+                connectionIndicator.textContent = '🔴 Offline';
+                connectionIndicator.className = 'text-red-100';
+                connectionBanner.classList.remove('hidden');
+                document.getElementById('ai-status').textContent = 'Offline';
+                document.getElementById('ai-status').className = 'text-xs bg-red-100 text-red-800 px-2 py-1 rounded';
+            }
+        }
+
+        function enableUI(enabled = true) {
+            const elements = [
+                'new-project-btn', 'show-projects-btn', 'create-scene-btn',
+                'ai-analyze-btn', 'ai-suggest-btn', 'ai-generate-btn',
+                'scene-title', 'scene-description', 'scene-type', 'scene-location', 'scene-conflict'
+            ];
+            
+            elements.forEach(id => {
+                const element = document.getElementById(id);
+                if (element) {
+                    element.disabled = !enabled;
+                }
+            });
+
+            // Show/hide user elements
+            document.getElementById('token-display').style.display = enabled ? 'block' : 'none';
+            document.getElementById('user-display').style.display = enabled ? 'block' : 'none';
+            document.getElementById('logout-button').style.display = enabled ? 'block' : 'none';
+        }
+
+        function showLoading(message = 'Načítám...') {
+            loadingMessage.textContent = message;
+            loadingOverlay.classList.remove('hidden');
+        }
+
+        function hideLoading() {
+            loadingOverlay.classList.add('hidden');
+        }
+
+        function showToast(message, type = 'info') {
+            const toast = document.createElement('div');
+            const bgColor = type === 'success' ? 'bg-green-500' : 
+                           type === 'error' ? 'bg-red-500' : 
+                           type === 'warning' ? 'bg-yellow-500' : 'bg-blue-500';
+            
+            toast.className = `${bgColor} text-white px-6 py-3 rounded-lg shadow-lg transform transition-all duration-300 translate-x-full`;
+            toast.textContent = message;
+            
+            document.getElementById('toast-container').appendChild(toast);
+            
+            setTimeout(() => toast.classList.remove('translate-x-full'), 100);
+            setTimeout(() => {
+                toast.classList.add('translate-x-full');
+                setTimeout(() => toast.remove(), 300);
+            }, 4000);
+        }
+
+        function showLoginError(message) {
+            loginError.querySelector('p').textContent = message;
+            loginError.classList.remove('hidden');
+        }
+
+        function hideLoginError() {
+            loginError.classList.add('hidden');
+        }
+
+        function updateTokenDisplay() {
+            if (!currentUser) return;
+            
+            const percentage = (currentUser.tokens_used / currentUser.tokens_limit) * 100;
+            tokenMeter.style.width = percentage + '%';
+            tokenCount.textContent = `${(currentUser.tokens_used/1000).toFixed(1)}k/${(currentUser.tokens_limit/1000).toFixed(0)}k`;
+            
+            if (percentage > 90) {
+                tokenMeter.className = 'h-full bg-red-400 transition-all';
+            } else if (percentage > 75) {
+                tokenMeter.className = 'h-full bg-yellow-400 transition-all';
+            } else {
+                tokenMeter.className = 'h-full bg-green-400 transition-all';
+            }
+        }
+
+        // Authentication Functions
+        async function checkAuthStatus() {
+            try {
+                updateConnectionStatus(true);
+                const response = await api.getCurrentUser();
+                currentUser = response.user;
+                userInfo.textContent = `${currentUser.username} (${currentUser.plan})`;
+                updateTokenDisplay();
+                isAuthenticated = true;
+                enableUI(true);
+                loginModal.classList.add('hidden');
+                
+                document.getElementById('ai-message').textContent = 'Vyberte projekt a začněte tvořit scény. Pomohu s analýzou objektů a návrhy dalších scén.';
+                
+                await loadProjects();
+                return true;
+            } catch (error) {
+                console.log('Not authenticated:', error.message);
+                isAuthenticated = false;
+                enableUI(false);
+                loginModal.classList.remove('hidden');
+                
+                document.getElementById('current-project-title').textContent = 'Přihlaste se pro pokračování';
+                document.getElementById('ai-message').textContent = 'Přihlaste se pro používání AI funkcí.';
+                
+                return false;
+            }
+        }
+
+        loginForm.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            
+            const email = document.getElementById('login-email').value;
+            const password = document.getElementById('login-password').value;
+            const loginButton = document.getElementById('login-button');
+            
+            loginButton.disabled = true;
+            loginButton.textContent = 'Přihlašuji...';
+            hideLoginError();
+            
+            try {
+                const response = await api.login(email, password);
+                currentUser = response.user;
+                userInfo.textContent = `${currentUser.username} (${currentUser.plan})`;
+                updateTokenDisplay();
+                isAuthenticated = true;
+                enableUI(true);
+                loginModal.classList.add('hidden');
+                showToast('Úspěšně přihlášen!', 'success');
+                await loadProjects();
+            } catch (error) {
+                showLoginError('Chyba při přihlášení: ' + error.message);
+                showToast('Chyba při přihlášení: ' + error.message, 'error');
+            } finally {
+                loginButton.disabled = false;
+                loginButton.textContent = 'Přihlásit se';
+            }
+        });
+
+        async function logout() {
+            try {
+                await api.logout();
+                currentUser = null;
+                currentProject = null;
+                currentProjectData = null;
+                isAuthenticated = false;
+                enableUI(false);
+                loginModal.classList.remove('hidden');
+                clearInterface();
+                showToast('Odhlášen', 'info');
+            } catch (error) {
+                showToast('Chyba při odhlášení', 'error');
+            }
+        }
+
+        // Project Functions
+        async function loadProjects() {
+            try {
+                const projects = await api.getProjects();
+                displayProjects(projects);
+                
+                if (projects.length > 0 && !currentProject) {
+                    await selectProject(projects[0].id);
+                } else if (projects.length === 0) {
+                    document.getElementById('current-project-title').textContent = 'Vytvořte první projekt';
+                    document.getElementById('ai-message').textContent = 'Vytvořte projekt a přidejte scény pro začátek práce s AI.';
+                }
+            } catch (error) {
+                showToast('Chyba při načítání projektů: ' + error.message, 'error');
+                console.error('Load projects error:', error);
+            }
+        }
+
+        function displayProjects(projects) {
+            const container = document.getElementById('projects-list');
+            
+            if (projects.length === 0) {
+                container.innerHTML = `
+                    <div class="text-center text-gray-500 py-8">
+                        <span class="text-3xl mb-2 block">📝</span>
+                        <p class="text-sm mb-4">Zatím nemáte žádné projekty</p>
+                        <button onclick="createNewProject()" class="bg-blue-500 text-white px-4 py-2 rounded-lg hover:bg-blue-600">
+                            Vytvořit první projekt
+                        </button>
+                    </div>
+                `;
+                return;
+            }
+
+            container.innerHTML = projects.map(project => `
+                <div class="project-item p-3 border rounded-lg cursor-pointer hover:bg-gray-50 transition-all ${currentProject === project.id ? 'border-blue-500 bg-blue-50' : 'border-gray-200'}"
+                     onclick="selectProject('${project.id}')">
+                    <div class="flex items-center justify-between">
+                        <div>
+                            <h4 class="font-medium text-gray-800">${project.title}</h4>
+                            <p class="text-xs text-gray-600">${project.genre || 'Neurčeno'} • ${project.scene_count} scén</p>
+                        </div>
+                        <div class="text-xs text-gray-500">
+                            ${project.current_phase}
+                        </div>
+                    </div>
+                </div>
+            `).join('');
+        }
+
+        async function selectProject(projectId) {
+            if (!isAuthenticated) {
+                showToast('Nejdříve se přihlaste', 'warning');
+                return;
+            }
+
+            showLoading('Načítám projekt...');
+            
+            try {
+                currentProject = projectId;
+                const response = await api.getProject(projectId);
+                currentProjectData = response;
+                
+                updateProjectDisplay();
+                displayScenes(response.scenes);
+                displayObjects(response.objects);
+                
+                hideLoading();
+                showToast('Projekt načten', 'success');
+            } catch (error) {
+                hideLoading();
+                showToast('Chyba při načítání projektu: ' + error.message, 'error');
+                console.error('Select project error:', error);
+            }
+        }
+
+        function updateProjectDisplay() {
+            if (!currentProjectData) return;
+            
+            const project = currentProjectData.project;
+            const scenes = currentProjectData.scenes;
+            const objects = currentProjectData.objects;
+            
+            document.getElementById('current-project-title').textContent = project.title;
+            document.getElementById('stat-outlines').textContent = '1';
+            document.getElementById('stat-scenes').textContent = scenes.length;
+            document.getElementById('stat-objects').textContent = objects.length;
+            document.getElementById('stat-words').textContent = (project.current_word_count || 0).toLocaleString();
+            document.getElementById('stat-phase').textContent = project.current_phase;
+            document.getElementById('scene-count-display').textContent = `${scenes.length} scén`;
+            
+            // Update AI message
+            const aiMessage = document.getElementById('ai-message');
+            if (scenes.length === 0) {
+                aiMessage.textContent = 'Vytvořte první scénu. Automaticky rozpoznám objekty a navrhnu další scény.';
+            } else {
+                aiMessage.textContent = `Projekt má ${scenes.length} scén a ${objects.length} objektů. Mohu analyzovat strukturu nebo navrhnout další scény.`;
+            }
+        }
+
+        function displayScenes(scenes) {
+            const container = document.getElementById('scene-timeline');
+            
+            if (scenes.length === 0) {
+                container.innerHTML = `
+                    <div class="text-center text-gray-500 py-12">
+                        <span class="text-4xl mb-4 block">🎬</span>
+                        <p class="text-lg mb-2">Zatím nemáte žádné scény</p>
+                        <p class="text-sm">Vytvořte první scénu výše</p>
+                    </div>
+                `;
+                return;
+            }
+
+            container.innerHTML = scenes.map((scene, index) => `
+                <div class="scene-node bg-gradient-to-r from-blue-50 to-indigo-50 rounded-xl p-5 border-l-4 border-blue-500" data-scene-id="${scene.id}">
+                    <div class="flex items-center justify-between mb-3">
+                        <div class="flex items-center gap-3">
+                            <span class="bg-blue-500 text-white text-sm px-3 py-1 rounded-full font-medium">${index + 1}</span>
+                            <h4 class="font-bold text-gray-800">${scene.title}</h4>
+                            <span class="text-xs bg-yellow-100 text-yellow-800 px-2 py-1 rounded">${scene.scene_type}</span>
+                        </div>
+                        <div class="flex gap-1">
+                            <button onclick="editScene(${scene.id})" class="text-gray-400 hover:text-blue-600 transition-colors">✏️</button>
+                            <button onclick="deleteScene(${scene.id})" class="text-gray-400 hover:text-red-600 transition-colors">🗑️</button>
+                        </div>
+                    </div>
+                    
+                    <div class="grid grid-cols-2 gap-4 mb-4">
+                        <div class="space-y-2">
+                            <div class="text-xs font-medium text-gray-600">📍 Lokace</div>
+                            <span class="object-tag bg-emerald-100 text-emerald-800 text-xs px-2 py-1 rounded-full">${scene.location || 'Neurčeno'}</span>
+                        </div>
+                        <div class="space-y-2">
+                            <div class="text-xs font-medium text-gray-600">🔧 Objekty</div>
+                            <div class="flex flex-wrap gap-1">
+                                ${scene.objects.map(obj => `
+                                    <span class="object-tag bg-blue-100 text-blue-800 text-xs px-2 py-1 rounded-full">${obj.name}</span>
+                                `).join('')}
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="bg-white rounded-lg p-3 text-sm text-gray-700 mb-3">
+                        <strong>Popis:</strong> ${scene.description}
+                    </div>
+                    
+                    <div class="flex items-center justify-between text-xs text-gray-500">
+                        <span>💬 ${scene.dialog_count} dialogů • ⚡ ${scene.conflict || 'Bez konfliktu'}</span>
+                        <span>📝 ${scene.word_count || 0} slov</span>
+                    </div>
+                </div>
+            `).join('');
+        }
+
+        function displayObjects(objects) {
+            const container = document.getElementById('objects-container');
+            
+            if (objects.length === 0) {
+                container.innerHTML = `
+                    <div class="text-center text-gray-500 py-8">
+                        <span class="text-3xl mb-2 block">🔧</span>
+                        <p class="text-sm">Objekty se vytvoří automaticky při přidávání scén</p>
+                    </div>
+                `;
+                return;
+            }
+
+            // Group objects by type
+            const groupedObjects = objects.reduce((groups, obj) => {
+                const type = obj.object_type || 'other';
+                if (!groups[type]) groups[type] = [];
+                groups[type].push(obj);
+                return groups;
+            }, {});
+
+            const typeIcons = {
+                'character': '👥',
+                'location': '📍',
+                'object': '🔧',
+                'prop': '🎭',
+                'conflict': '⚡',
+                'other': '📦'
+            };
+
+            const typeNames = {
+                'character': 'Postavy',
+                'location': 'Lokace',
+                'object': 'Objekty',
+                'prop': 'Rekvizity',
+                'conflict': 'Konflikty',
+                'other': 'Ostatní'
+            };
+
+            container.innerHTML = Object.entries(groupedObjects).map(([type, objs]) => `
+                <div class="border rounded-lg p-4">
+                    <h4 class="font-medium text-gray-800 mb-3 flex items-center gap-2">
+                        <span class="text-lg">${typeIcons[type] || '📦'}</span>
+                        ${typeNames[type] || type}
+                        <span class="text-xs bg-gray-100 px-2 py-1 rounded">${objs.length}</span>
+                    </h4>
+                    <div class="grid grid-cols-1 gap-2">
+                        ${objs.map(obj => `
+                            <div class="object-tag bg-blue-50 border border-blue-200 rounded-lg p-3 hover:bg-blue-100 transition-all cursor-pointer">
+                                <div class="font-medium text-blue-800">${obj.name}</div>
+                                <div class="text-xs text-blue-600">
+                                    ${obj.importance} • ${obj.scene_count} scén • ${obj.status}
+                                </div>
+                                ${obj.description ? `<div class="text-xs text-gray-500 mt-1">${obj.description}</div>` : ''}
+                            </div>
+                        `).join('')}
+                    </div>
+                </div>
+            `).join('');
+        }
+
+        // Scene Functions
+        async function createScene() {
+            if (!currentProject) {
+                showToast('Nejdříve vyberte projekt', 'error');
+                return;
+            }
+
+            const title = document.getElementById('scene-title').value.trim();
+            const description = document.getElementById('scene-description').value.trim();
+            const sceneType = document.getElementById('scene-type').value;
+            const location = document.getElementById('scene-location').value.trim();
+            const conflict = document.getElementById('scene-conflict').value.trim();
+
+            if (!title || !description) {
+                showToast('Vyplňte název a popis scény', 'error');
+                return;
+            }
+
+            showLoading('Vytvářím scénu a analyzuji objekty...');
+
+            try {
+                const sceneData = {
+                    project_id: currentProject,
+                    title,
+                    description,
+                    scene_type: sceneType,
+                    location: location || null,
+                    conflict: conflict || null
+                };
+
+                await api.createScene(sceneData);
+                
+                // Refresh current user (tokens updated)
+                const userResponse = await api.getCurrentUser();
+                currentUser = userResponse.user;
+                updateTokenDisplay();
+                
+                // Reload project data
+                await selectProject(currentProject);
+                
+                // Clear form
+                document.getElementById('scene-title').value = '';
+                document.getElementById('scene-description').value = '';
+                document.getElementById('scene-location').value = '';
+                document.getElementById('scene-conflict').value = '';
+                
+                hideLoading();
+                showToast('Scéna vytvořena! AI objekty rozpoznány.', 'success');
+                
+            } catch (error) {
+                hideLoading();
+                showToast('Chyba při vytváření scény: ' + error.message, 'error');
+                console.error('Create scene error:', error);
+            }
+        }
+
+        async function deleteScene(sceneId) {
+            if (!confirm('Opravdu smazat scénu?')) return;
+
+            showLoading('Maže scénu...');
+
+            try {
+                await api.deleteScene(sceneId);
+                await selectProject(currentProject); // Reload project
+                hideLoading();
+                showToast('Scéna smazána', 'success');
+            } catch (error) {
+                hideLoading();
+                showToast('Chyba při mazání scény: ' + error.message, 'error');
+                console.error('Delete scene error:', error);
+            }
+        }
+
+        // AI Functions
+        async function aiAnalyzeStructure() {
+            if (!currentProject) {
+                showToast('Nejdříve vyberte projekt', 'error');
+                return;
+            }
+
+            if (!currentProjectData || currentProjectData.scenes.length === 0) {
+                showToast('Projekt musí mít alespoň jednu scénu pro analýzu', 'warning');
+                return;
+            }
+
+            showLoading('AI analyzuje strukturu příběhu...');
+
+            try {
+                const analysis = await api.analyzeStructure(currentProject);
+                
+                // Update tokens
+                const userResponse = await api.getCurrentUser();
+                currentUser = userResponse.user;
+                updateTokenDisplay();
+                
+                displayAIAnalysis(analysis.analysis);
+                hideLoading();
+                showToast('Analýza dokončena!', 'success');
+                
+            } catch (error) {
+                hideLoading();
+                showToast('Chyba AI analýzy: ' + error.message, 'error');
+                console.error('AI analysis error:', error);
+            }
+        }
+
+        async function aiSuggestScenes() {
+            if (!currentProject) {
+                showToast('Nejdříve vyberte projekt', 'error');
+                return;
+            }
+
+            showLoading('AI navrhuje nové scény...');
+
+            try {
+                const suggestions = await api.suggestScenes(currentProject);
+                
+                // Update tokens
+                const userResponse = await api.getCurrentUser();
+                currentUser = userResponse.user;
+                updateTokenDisplay();
+                
+                displaySceneSuggestions(suggestions.suggestions);
+                hideLoading();
+                showToast('Návrhy scén připraveny!', 'success');
+                
+            } catch (error) {
+                hideLoading();
+                showToast('Chyba AI návrhů: ' + error.message, 'error');
+                console.error('AI suggestions error:', error);
+            }
+        }
+
+        function displayAIAnalysis(analysis) {
+            const container = document.getElementById('ai-analysis');
+            
+            container.innerHTML = `
+                <div class="space-y-3">
+                    <div class="bg-blue-50 p-3 rounded">
+                        <h4 class="text-sm font-medium text-blue-800 mb-1">📊 Struktura</h4>
+                        <div class="text-xs text-blue-700">
+                            <div>Celkem scén: ${analysis.total_scenes}</div>
+                            <div>Kontinuita: ${Math.round((analysis.continuity_score || 0) * 100)}%</div>
+                            <div>Tempo: ${Math.round((analysis.pacing_score || 0) * 100)}%</div>
+                        </div>
+                    </div>
+                    
+                    <div class="bg-yellow-50 p-3 rounded">
+                        <h4 class="text-sm font-medium text-yellow-800 mb-1">⚠️ Chybějící prvky</h4>
+                        <div class="text-xs text-yellow-700">
+                            ${(analysis.missing_elements || []).length > 0 ? 
+                                analysis.missing_elements.map(element => `<div>• ${element}</div>`).join('') :
+                                '<div>Struktura je kompletní</div>'
+                            }
+                        </div>
+                    </div>
+                    
+                    <div class="bg-green-50 p-3 rounded">
+                        <h4 class="text-sm font-medium text-green-800 mb-1">💡 Doporučení</h4>
+                        <div class="text-xs text-green-700">
+                            ${(analysis.recommendations || []).map(rec => `<div>• ${rec}</div>`).join('')}
+                        </div>
+                    </div>
+                    
+                    ${analysis.scene_types ? `
+                        <div class="bg-purple-50 p-3 rounded">
+                            <h4 class="text-sm font-medium text-purple-800 mb-1">🎭 Typy scén</h4>
+                            <div class="text-xs text-purple-700">
+                                ${Object.entries(analysis.scene_types).map(([type, count]) => 
+                                    `<div>${type}: ${count}x</div>`
+                                ).join('')}
+                            </div>
+                        </div>
+                    ` : ''}
+                </div>
+            `;
+        }
+
+        function displaySceneSuggestions(suggestions) {
+            const container = document.getElementById('ai-analysis');
+            
+            container.innerHTML = `
+                <div class="space-y-3">
+                    <h4 class="font-medium text-gray-800 mb-3">🤖 AI Návrhy scén</h4>
+                    ${suggestions.map((suggestion, index) => `
+                        <div class="bg-gradient-to-r from-yellow-50 to-orange-50 rounded-lg p-4 border-2 border-dashed border-yellow-300">
+                            <div class="flex items-center gap-3 mb-2">
+                                <span class="bg-yellow-500 text-white text-xs px-2 py-1 rounded-full">${index + 1}</span>
+                                <h5 class="font-medium text-yellow-800">${suggestion.title}</h5>
+                                <span class="text-xs text-yellow-600">${Math.round((suggestion.confidence || 0.8) * 100)}% shoda</span>
+                            </div>
+                            <p class="text-sm text-yellow-700 mb-3">${suggestion.description}</p>
+                            <div class="flex gap-2">
+                                <button onclick="acceptSuggestion('${suggestion.title.replace(/'/g, "\\'")}', '${suggestion.description.replace(/'/g, "\\'")}', '${suggestion.scene_type}')" 
+                                        class="px-3 py-1.5 bg-yellow-500 text-white rounded text-sm hover:bg-yellow-600">
+                                    ✅ Přijmout
+                                </button>
+                                <button class="px-3 py-1.5 bg-gray-400 text-white rounded text-sm hover:bg-gray-500">
+                                    ✏️ Upravit
+                                </button>
+                            </div>
+                        </div>
+                    `).join('')}
+                </div>
+            `;
+        }
+
+        function acceptSuggestion(title, description, sceneType) {
+            document.getElementById('scene-title').value = title;
+            document.getElementById('scene-description').value = description;
+            document.getElementById('scene-type').value = sceneType;
+            
+            showToast('Návrh načten do formuláře', 'success');
+            
+            // Scroll to form
+            document.getElementById('scene-title').scrollIntoView({ behavior: 'smooth', block: 'center' });
+        }
+
+        // Project Management
+        async function createNewProject() {
+            if (!isAuthenticated) {
+                showToast('Nejdříve se přihlaste', 'warning');
+                return;
+            }
+
+            const title = prompt('Název nového projektu:');
+            if (!title) return;
+            
+            const description = prompt('Popis projektu (volitelné):');
+            const genre = prompt('Žánr (volitelné):');
+
+            showLoading('Vytvářím projekt...');
+
+            try {
+                const response = await api.createProject({
+                    title,
+                    description: description || '',
+                    genre: genre || null
+                });
+
+                await loadProjects();
+                if (response.project) {
+                    await selectProject(response.project.id);
+                }
+                
+                hideLoading();
+                showToast('Projekt vytvořen!', 'success');
+                
+            } catch (error) {
+                hideLoading();
+                showToast('Chyba při vytváření projektu: ' + error.message, 'error');
+                console.error('Create project error:', error);
+            }
+        }
+
+        function showProjectList() {
+            showToast('Seznam projektů je zobrazen vpravo', 'info');
+        }
+
+        // Phase Management
+        function setPhase(phase) {
+            currentPhase = phase;
+            
+            // Update visual state
+            document.querySelectorAll('.workflow-phase').forEach(el => {
+                el.classList.remove('active');
+            });
+            document.getElementById(`phase-${phase}`).classList.add('active');
+            
+            showToast(`Přepnuto na fázi: ${phase}`, 'info');
+        }
+
+        // Utility functions
+        function clearInterface() {
+            document.getElementById('current-project-title').textContent = 'Přihlaste se pro pokračování';
+            document.getElementById('projects-list').innerHTML = '<div class="text-center text-gray-500 py-8">Přihlaste se</div>';
+            document.getElementById('scene-timeline').innerHTML = '<div class="text-center text-gray-500 py-12">Přihlaste se</div>';
+            document.getElementById('objects-container').innerHTML = '<div class="text-center text-gray-500 py-8">Přihlaste se</div>';
+            document.getElementById('ai-analysis').innerHTML = '<div class="text-center text-gray-500 py-8">Přihlaste se</div>';
+            
+            // Reset stats
+            ['stat-outlines', 'stat-scenes', 'stat-objects', 'stat-words', 'stat-phase'].forEach(id => {
+                document.getElementById(id).textContent = '-';
+            });
+            document.getElementById('scene-count-display').textContent = '- scén';
+        }
+
+        function editScene(sceneId) {
+            showToast('Editace scény bude implementována', 'info');
+        }
+
+        async function aiGenerateStory() {
+            showToast('Generace příběhu bude implementována', 'info');
+        }
+
+        function showServerHelp() {
+            document.getElementById('server-help-modal').classList.remove('hidden');
+        }
+
+        function hideServerHelp() {
+            document.getElementById('server-help-modal').classList.add('hidden');
+        }
+
+        async function retryConnection() {
+            showLoading('Zkouším připojit k serveru...');
+            
+            try {
+                console.log('Manual connection test...');
+                console.log('Testing /health endpoint...');
+                
+                // Manual test of endpoints
+                try {
+                    const healthResponse = await fetch('/health');
+                    console.log('Health response status:', healthResponse.status);
+                    console.log('Health response ok:', healthResponse.ok);
+                } catch (e) {
+                    console.error('Health fetch error:', e);
+                }
+                
+                try {
+                    const apiResponse = await fetch('/api');
+                    console.log('API response status:', apiResponse.status);
+                    console.log('API response ok:', apiResponse.ok);
+                } catch (e) {
+                    console.error('API fetch error:', e);
+                }
+                
+                const isOnline = await api.healthCheck();
+                console.log('API healthCheck result:', isOnline);
+                
+                if (isOnline) {
+                    updateConnectionStatus(true);
+                    if (!isAuthenticated) {
+                        await checkAuthStatus();
+                    }
+                    hideLoading();
+                    showToast('Připojení obnoveno!', 'success');
+                } else {
+                    throw new Error('Health check failed');
+                }
+            } catch (error) {
+                console.error('Retry connection error:', error);
+                updateConnectionStatus(false);
+                hideLoading();
+                showToast('Připojení se nezdařilo. Zkontrolujte Flask server.', 'error');
+            }
+        }
+
+        // Initialize Application
+        document.addEventListener('DOMContentLoaded', async () => {
+            console.log('🎭 StoryForge AI - Initializing...');
+            console.log('Testing endpoints:');
+            console.log('- Health check: /health');
+            console.log('- API info: /api');
+            console.log('- Auth: /api/auth/*');
+            
+            // Try to connect and authenticate
+            try {
+                updateConnectionStatus(false);
+                connectionIndicator.textContent = '🔄 Připojuji...';
+                
+                // Test connection first
+                console.log('Testing health check endpoint...');
+                const isOnline = await api.healthCheck();
+                console.log('Health check result:', isOnline);
+                
+                if (!isOnline) {
+                    throw new Error('Server is not responding');
+                }
+                
+                updateConnectionStatus(true);
+                console.log('Server is online, checking authentication...');
+                await checkAuthStatus();
+                isInitialized = true;
+                
+                console.log('✅ StoryForge AI - Initialized successfully');
+                
+            } catch (error) {
+                console.error('❌ StoryForge AI - Initialization failed:', error);
+                updateConnectionStatus(false);
+                clearInterface();
+                
+                // Show helpful error message
+                document.getElementById('current-project-title').textContent = 'Problém s připojením k serveru';
+                document.getElementById('ai-message').textContent = 'Nemohu se připojit k Flask serveru. Zkontrolujte, zda běží na portu 5000.';
+            }
+        });
+
+        // Add ripple effects to interactive elements
+        document.addEventListener('click', function(e) {
+            if (e.target.classList.contains('scene-node') || e.target.closest('.scene-node')) {
+                const element = e.target.classList.contains('scene-node') ? e.target : e.target.closest('.scene-node');
+                element.classList.add('ripple-effect');
+                setTimeout(() => element.classList.remove('ripple-effect'), 600);
+            }
+        });
+
+        // Prevent console warnings for extensions
+        window.addEventListener('error', function(e) {
+            if (e.filename && e.filename.includes('extension')) {
+                e.preventDefault();
+                return false;
+            }
+        });
+    </script>
+</body>
+</html>
