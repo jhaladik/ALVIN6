@@ -1,7 +1,8 @@
-# app/services/ai_analyzer.py - UPDATED with Claude API
+# app/services/ai_analyzer.py - EXTENDED with Idea Analysis
 import json
 import re
 from typing import Dict, List, Optional
+from flask import current_app
 from app.services.claude_api import ClaudeAPIClient
 from app.models import StoryObject, Scene, Project
 
@@ -11,6 +12,239 @@ class AIAnalyzer:
     def __init__(self):
         self.claude = ClaudeAPIClient()
     
+    def analyze_idea(self, idea_text: str, story_intent: str = None) -> Dict:
+        """Analyze free-form idea text and extract story structure"""
+        
+        system_prompt = """Jste expert na analýzu a rozvoj příběhových nápadů. Umíte z volného textu extrahovat strukturované elementy příběhu a navrhnout další kroky.
+
+Vaším úkolem je:
+1. Analyzovat nápad a identifikovat klíčové elementy
+2. Navrhnout žánr a tón příběhu  
+3. Extrahovat objekty (postavy, lokace, objekty, konflikty)
+4. Navrhnout první scénu
+5. Poskytnout doporučení pro rozvoj
+
+Odpovězte striktně ve formátu JSON bez dalšího textu."""
+
+        intent_context = ""
+        if story_intent:
+            intent_context = f"\nUSER INTENT: Uživatel naznačil zájem o {story_intent}"
+
+        prompt = f"""Analyzujte tento nápad a vytvořte strukturu příběhu:
+
+NÁPAD:
+{idea_text}
+{intent_context}
+
+Vraťte JSON ve formátu:
+{{
+    "story_assessment": {{
+        "genre": "navržený žánr",
+        "tone": "tón příběhu (dark/light/mysterious/comedic)",
+        "target_audience": "cílová skupina",
+        "estimated_scope": "rozsah (short-story/novella/novel)",
+        "themes": ["hlavní témata"],
+        "marketability": "komerční potenciál (1-5)"
+    }},
+    "extracted_objects": {{
+        "characters": ["postava1", "postava2"],
+        "locations": ["lokace1", "lokace2"], 
+        "objects": ["objekt1", "objekt2"],
+        "conflicts": ["konflikt1", "konflikt2"]
+    }},
+    "first_scene_suggestion": {{
+        "title": "název první scény",
+        "description": "detailní popis co se děje",
+        "scene_type": "inciting/development/opening",
+        "location": "kde se odehrává",
+        "objects": ["objekty použité ve scéně"],
+        "hook": "úvodní hook",
+        "conflict": "konflikt ve scéně"
+    }},
+    "project_suggestions": {{
+        "title": "navržený název projektu",
+        "description": "popis projektu v 2-3 větách",
+        "target_length": "cílová délka v slovech"
+    }},
+    "next_steps": {{
+        "immediate_actions": ["co udělat hned"],
+        "development_areas": ["oblasti k rozvoji"],
+        "potential_subplots": ["možné vedlejší linky"]
+    }}
+}}
+
+Buďte kreativní ale zůstaňte věrní původnímu nápadu."""
+
+        try:
+            response = self.claude._make_request(prompt, system_prompt, max_tokens=2000)
+            
+            # Parse JSON response
+            json_match = re.search(r'\{.*\}', response, re.DOTALL)
+            if json_match:
+                result = json.loads(json_match.group())
+                
+                # Validate and ensure all required fields exist
+                self._validate_idea_analysis(result)
+                
+                return result
+            else:
+                raise ValueError("No JSON found in response")
+                
+        except Exception as e:
+            try:
+                current_app.logger.error(f"Error in analyze_idea: {str(e)}")
+            except RuntimeError:
+                print(f"Error in analyze_idea: {str(e)}")
+            
+            # Fallback analysis
+            return self._fallback_idea_analysis(idea_text, story_intent)
+    
+    def _validate_idea_analysis(self, result: Dict) -> None:
+        """Validate and fix idea analysis structure"""
+        # Ensure main sections exist
+        if 'story_assessment' not in result:
+            result['story_assessment'] = {}
+        if 'extracted_objects' not in result:
+            result['extracted_objects'] = {}
+        if 'first_scene_suggestion' not in result:
+            result['first_scene_suggestion'] = {}
+        if 'project_suggestions' not in result:
+            result['project_suggestions'] = {}
+        if 'next_steps' not in result:
+            result['next_steps'] = {}
+        
+        # Validate story_assessment
+        story_defaults = {
+            'genre': 'drama',
+            'tone': 'balanced',
+            'target_audience': 'general',
+            'estimated_scope': 'short-story',
+            'themes': [],
+            'marketability': 3
+        }
+        for key, default in story_defaults.items():
+            if key not in result['story_assessment']:
+                result['story_assessment'][key] = default
+        
+        # Validate extracted_objects
+        object_defaults = {
+            'characters': [],
+            'locations': [],
+            'objects': [],
+            'conflicts': []
+        }
+        for key, default in object_defaults.items():
+            if key not in result['extracted_objects']:
+                result['extracted_objects'][key] = default
+            elif not isinstance(result['extracted_objects'][key], list):
+                result['extracted_objects'][key] = []
+        
+        # Validate first_scene_suggestion
+        scene_defaults = {
+            'title': 'Úvodní scéna',
+            'description': 'Úvodní scéna příběhu',
+            'scene_type': 'opening',
+            'location': '',
+            'objects': [],
+            'hook': '',
+            'conflict': ''
+        }
+        for key, default in scene_defaults.items():
+            if key not in result['first_scene_suggestion']:
+                result['first_scene_suggestion'][key] = default
+        
+        # Validate project_suggestions
+        project_defaults = {
+            'title': 'Nový projekt',
+            'description': 'Příběh vytvořený z nápadu',
+            'target_length': '10000'
+        }
+        for key, default in project_defaults.items():
+            if key not in result['project_suggestions']:
+                result['project_suggestions'][key] = default
+        
+        # Validate next_steps
+        steps_defaults = {
+            'immediate_actions': [],
+            'development_areas': [],
+            'potential_subplots': []
+        }
+        for key, default in steps_defaults.items():
+            if key not in result['next_steps']:
+                result['next_steps'][key] = default
+            elif not isinstance(result['next_steps'][key], list):
+                result['next_steps'][key] = []
+    
+    def _fallback_idea_analysis(self, idea_text: str, story_intent: str = None) -> Dict:
+        """Fallback idea analysis using simple text processing"""
+        
+        idea_lower = idea_text.lower()
+        
+        # Simple genre detection
+        genre = 'drama'  # default
+        if any(word in idea_lower for word in ['tajemství', 'záhada', 'dopis', 'šifra']):
+            genre = 'mystery'
+        elif any(word in idea_lower for word in ['sci-fi', 'budoucnost', 'robot', 'vesmír']):
+            genre = 'sci-fi'
+        elif any(word in idea_lower for word in ['láska', 'romance', 'srdce']):
+            genre = 'romance'
+        elif any(word in idea_lower for word in ['fantasy', 'magie', 'elf', 'trpaslík']):
+            genre = 'fantasy'
+        
+        # Simple character extraction
+        characters = []
+        for name in ['sarah', 'pavel', 'anna', 'marie', 'tom', 'petr']:
+            if name in idea_lower:
+                characters.append(name.capitalize())
+        
+        # Simple location extraction  
+        locations = []
+        for loc in ['knihovna', 'dům', 'město', 'vesnice', 'škola', 'archiv']:
+            if loc in idea_lower:
+                locations.append(loc.capitalize())
+        
+        # Simple object extraction
+        objects = []
+        for obj in ['dopis', 'kniha', 'fotografie', 'klíč', 'telefon', 'auto']:
+            if obj in idea_lower:
+                objects.append(obj.capitalize())
+        
+        return {
+            'story_assessment': {
+                'genre': genre,
+                'tone': 'mysterious' if genre == 'mystery' else 'balanced',
+                'target_audience': 'general',
+                'estimated_scope': 'short-story',
+                'themes': ['family', 'secrets'] if 'tajemství' in idea_lower else ['adventure'],
+                'marketability': 3
+            },
+            'extracted_objects': {
+                'characters': characters or ['Protagonist'],
+                'locations': locations or ['Unknown location'],
+                'objects': objects,
+                'conflicts': ['Internal struggle']
+            },
+            'first_scene_suggestion': {
+                'title': 'Úvodní situace',
+                'description': f'Příběh začíná když protagonista... {idea_text[:100]}',
+                'scene_type': 'opening',
+                'location': locations[0] if locations else '',
+                'objects': objects[:2],
+                'hook': 'Co se stane když...',
+                'conflict': 'Protagonista čelí neočekávané situaci'
+            },
+            'project_suggestions': {
+                'title': 'Nový příběh',
+                'description': f'Příběh o {characters[0] if characters else "protagonistovi"} a jejich dobrodružství.',
+                'target_length': '15000'
+            },
+            'next_steps': {
+                'immediate_actions': ['Vytvořit projekt', 'Napsat první scénu'],
+                'development_areas': ['Charakterizace postav', 'Rozvoj světa'],
+                'potential_subplots': ['Vedlejší postavy', 'Romantická linka']
+            }
+        }
+
     def analyze_scene_objects(self, scene_description: str, project_context: str = "") -> Dict[str, List[str]]:
         """Extract objects from scene description using Claude"""
         
@@ -63,7 +297,11 @@ Buďte precizní a extrahujte pouze objekty explicitně zmíněné v textu."""
                 raise ValueError("No JSON found in response")
                 
         except Exception as e:
-            current_app.logger.error(f"Error in analyze_scene_objects: {str(e)}")
+            try:
+                current_app.logger.error(f"Error in analyze_scene_objects: {str(e)}")
+            except RuntimeError:
+                print(f"Error in analyze_scene_objects: {str(e)}")
+            
             # Fallback to simple keyword extraction
             return self._fallback_object_extraction(scene_description)
     
@@ -169,7 +407,10 @@ Vraťte JSON analýzu ve formátu:
                 raise ValueError("No JSON found in response")
                 
         except Exception as e:
-            current_app.logger.error(f"Error in analyze_story_structure: {str(e)}")
+            try:
+                current_app.logger.error(f"Error in analyze_story_structure: {str(e)}")
+            except RuntimeError:
+                print(f"Error in analyze_story_structure: {str(e)}")
             return self._fallback_structure_analysis(scenes)
     
     def _fallback_structure_analysis(self, scenes: List[Scene]) -> Dict:
@@ -273,7 +514,10 @@ Návrhů by mělo být 2-3, seřazené podle důležitosti."""
                 raise ValueError("No JSON array found in response")
                 
         except Exception as e:
-            current_app.logger.error(f"Error in suggest_next_scenes: {str(e)}")
+            try:
+                current_app.logger.error(f"Error in suggest_next_scenes: {str(e)}")
+            except RuntimeError:
+                print(f"Error in suggest_next_scenes: {str(e)}")
             return self._fallback_scene_suggestions(objects)
     
     def _fallback_scene_suggestions(self, objects: List[StoryObject]) -> List[Dict]:
@@ -372,7 +616,10 @@ Vraťte JSON ve formátu:
                 raise ValueError("No JSON found in response")
                 
         except Exception as e:
-            current_app.logger.error(f"Error in generate_story_from_scenes: {str(e)}")
+            try:
+                current_app.logger.error(f"Error in generate_story_from_scenes: {str(e)}")
+            except RuntimeError:
+                print(f"Error in generate_story_from_scenes: {str(e)}")
             return self._fallback_story_generation(project, scenes, objects)
     
     def _fallback_story_generation(self, project: Project, scenes: List[Scene], objects: List[StoryObject]) -> Dict:

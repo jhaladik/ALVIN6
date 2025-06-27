@@ -1,5 +1,6 @@
-# app/services/ai_critics.py - AI Critics using Claude
+# app/services/ai_critics.py - FIXED with proper imports
 from typing import Dict, List
+from flask import current_app  # ADDED: Import current_app
 from app.services.claude_api import ClaudeAPIClient
 from app.models import Scene, Project, StoryObject
 import json
@@ -51,6 +52,11 @@ Vraťte JSON kritiku:
             response = self.claude._make_request(prompt, system_prompt, max_tokens=1500)
             return self._parse_critique_response(response, "Professor Syntax", 4.0)
         except Exception as e:
+            # FIXED: Only log if current_app is available
+            try:
+                current_app.logger.error(f"Error in structure_critique: {str(e)}")
+            except RuntimeError:
+                print(f"Error in structure_critique: {str(e)}")
             return self._fallback_structure_critique(len(scenes))
     
     def character_critique(self, project: Project, scenes: List[Scene], characters: List[StoryObject]) -> Dict:
@@ -102,6 +108,11 @@ Vraťte JSON kritiku:
             response = self.claude._make_request(prompt, system_prompt, max_tokens=1500)
             return self._parse_critique_response(response, "Character Whisperer", 4.5)
         except Exception as e:
+            # FIXED: Only log if current_app is available
+            try:
+                current_app.logger.error(f"Error in character_critique: {str(e)}")
+            except RuntimeError:
+                print(f"Error in character_critique: {str(e)}")
             return self._fallback_character_critique(characters)
     
     def object_flow_critique(self, project: Project, scenes: List[Scene], objects: List[StoryObject]) -> Dict:
@@ -152,6 +163,11 @@ Vraťte JSON kritiku:
             response = self.claude._make_request(prompt, system_prompt, max_tokens=1500)
             return self._parse_critique_response(response, "Object Flow Analyzer", 3.8)
         except Exception as e:
+            # FIXED: Only log if current_app is available
+            try:
+                current_app.logger.error(f"Error in object_flow_critique: {str(e)}")
+            except RuntimeError:
+                print(f"Error in object_flow_critique: {str(e)}")
             return self._fallback_object_critique(objects)
     
     def _parse_critique_response(self, response: str, critic_name: str, fallback_score: float) -> Dict:
@@ -164,8 +180,12 @@ Vraťte JSON kritiku:
                 if 'score' not in critique:
                     critique['score'] = fallback_score
                 return critique
-        except:
-            pass
+        except Exception as e:
+            # FIXED: Only log if current_app is available
+            try:
+                current_app.logger.error(f"Error parsing critique response: {str(e)}")
+            except RuntimeError:
+                print(f"Error parsing critique response: {str(e)}")
         
         return {
             'critic_name': critic_name,

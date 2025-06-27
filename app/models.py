@@ -1,4 +1,4 @@
-# app/models.py - Database Models
+# app/models.py - EXTENDED Database Models with Project Attributes
 from app import db
 from datetime import datetime
 import uuid
@@ -50,6 +50,14 @@ class Project(db.Model):
     current_word_count = db.Column(db.Integer, default=0)
     status = db.Column(db.String(20), default='active')
     
+    # NEW: Additional project metadata
+    attributes = db.Column(db.JSON)  # For story_intent, themes, etc.
+    tone = db.Column(db.String(50))  # dark, light, mysterious, comedic
+    target_audience = db.Column(db.String(50))  # children, YA, adult
+    estimated_scope = db.Column(db.String(50))  # short-story, novella, novel
+    marketability = db.Column(db.Integer, default=3)  # 1-5 scale
+    original_idea = db.Column(db.Text)  # Store original idea text
+    
     # Timestamps
     created_at = db.Column(db.DateTime, default=datetime.utcnow, index=True)
     updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
@@ -70,6 +78,11 @@ class Project(db.Model):
             'current_phase': self.current_phase,
             'current_word_count': self.current_word_count,
             'scene_count': self.scenes.count(),
+            'tone': self.tone,
+            'target_audience': self.target_audience,
+            'estimated_scope': self.estimated_scope,
+            'marketability': self.marketability,
+            'attributes': self.attributes or {},
             'created_at': self.created_at.isoformat() if self.created_at else None,
             'updated_at': self.updated_at.isoformat() if self.updated_at else None
         }
@@ -87,6 +100,10 @@ class Scene(db.Model):
     emotional_intensity = db.Column(db.Float, default=0.5)
     word_count = db.Column(db.Integer, default=0)
     dialog_count = db.Column(db.Integer, default=0)
+    
+    # NEW: Additional scene metadata
+    hook = db.Column(db.Text)  # Scene hook/opening
+    character_focus = db.Column(db.String(200))  # Which character is focus
     
     # Timestamps
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
@@ -110,6 +127,8 @@ class Scene(db.Model):
             'emotional_intensity': self.emotional_intensity,
             'word_count': self.word_count,
             'dialog_count': self.dialog_count,
+            'hook': self.hook,
+            'character_focus': self.character_focus,
             'objects': [so.story_object.to_dict() for so in self.scene_objects.all()],
             'created_at': self.created_at.isoformat() if self.created_at else None
         }
@@ -125,6 +144,11 @@ class StoryObject(db.Model):
     status = db.Column(db.String(20), default='active', index=True)
     attributes = db.Column(db.JSON)
     
+    # NEW: Additional object metadata
+    first_appearance = db.Column(db.Integer)  # Scene order where first appears
+    symbolic_meaning = db.Column(db.Text)  # Symbolic significance
+    character_role = db.Column(db.String(50))  # For characters: protagonist, antagonist, etc.
+    
     # Foreign Keys
     project_id = db.Column(db.String(36), db.ForeignKey('project.id'), nullable=False, index=True)
     
@@ -139,7 +163,11 @@ class StoryObject(db.Model):
             'description': self.description,
             'importance': self.importance,
             'status': self.status,
-            'scene_count': self.scene_objects.count()
+            'scene_count': self.scene_objects.count(),
+            'first_appearance': self.first_appearance,
+            'symbolic_meaning': self.symbolic_meaning,
+            'character_role': self.character_role,
+            'attributes': self.attributes or {}
         }
 
 class SceneObject(db.Model):
@@ -150,6 +178,37 @@ class SceneObject(db.Model):
     role = db.Column(db.String(50))
     transformation = db.Column(db.Text)
     
+    # NEW: Additional relationship metadata
+    significance = db.Column(db.String(20), default='supporting')  # main, supporting, background
+    interaction_type = db.Column(db.String(50))  # dialogue, action, presence
+    
     # Foreign Keys
     scene_id = db.Column(db.Integer, db.ForeignKey('scene.id'), nullable=False, index=True)
     object_id = db.Column(db.Integer, db.ForeignKey('story_object.id'), nullable=False, index=True)
+
+# NEW: Template system for idea generation
+class IdeaTemplate(db.Model):
+    """Predefined templates for idea generation"""
+    __tablename__ = 'idea_template'
+    
+    id = db.Column(db.Integer, primary_key=True)
+    name = db.Column(db.String(100), nullable=False)
+    genre = db.Column(db.String(50), index=True)
+    prompt_template = db.Column(db.Text, nullable=False)
+    example_variables = db.Column(db.JSON)
+    description = db.Column(db.Text)
+    is_active = db.Column(db.Boolean, default=True)
+    usage_count = db.Column(db.Integer, default=0)
+    
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    
+    def to_dict(self):
+        return {
+            'id': self.id,
+            'name': self.name,
+            'genre': self.genre,
+            'prompt_template': self.prompt_template,
+            'example_variables': self.example_variables or {},
+            'description': self.description,
+            'usage_count': self.usage_count
+        }

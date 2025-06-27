@@ -1,11 +1,17 @@
-# app/services/claude_api.py - FIXED Claude API Client
+# app/services/claude_api.py - FIXED Claude API Client with proper imports
 import os
 import json
 import re
 import time
 from typing import Dict, List, Optional, Tuple
-from flask import current_app
 from functools import lru_cache
+
+# ADDED: Safe import for Flask current_app
+try:
+    from flask import current_app
+    FLASK_AVAILABLE = True
+except ImportError:
+    FLASK_AVAILABLE = False
 
 # Try different Anthropic imports for compatibility
 try:
@@ -50,6 +56,24 @@ class ClaudeAPIClient:
         self.max_requests_per_minute = int(os.getenv('CLAUDE_MAX_REQUESTS_PER_MINUTE', 50))
         self.max_tokens_per_request = int(os.getenv('CLAUDE_MAX_TOKENS_PER_REQUEST', 4000))
         self.request_times = []
+    
+    def _safe_log(self, message: str, level: str = 'error'):
+        """Safely log messages whether in Flask context or not"""
+        if FLASK_AVAILABLE:
+            try:
+                if level == 'error':
+                    current_app.logger.error(message)
+                elif level == 'info':
+                    current_app.logger.info(message)
+                elif level == 'warning':
+                    current_app.logger.warning(message)
+                else:
+                    current_app.logger.debug(message)
+            except RuntimeError:
+                # Not in Flask application context
+                print(f"[{level.upper()}] {message}")
+        else:
+            print(f"[{level.upper()}] {message}")
     
     def _check_rate_limit(self):
         """Check if we're within rate limits"""
@@ -120,20 +144,16 @@ class ClaudeAPIClient:
             
         except Exception as e:
             error_msg = str(e)
-            print(f"Claude API error: {error_msg}")
-            
-            # Log to Flask if available
-            if current_app:
-                current_app.logger.error(f"Claude API error: {error_msg}")
+            self._safe_log(f"Claude API error: {error_msg}", 'error')
             
             # Fallback to simulation for certain errors
             if any(keyword in error_msg.lower() for keyword in ['rate limit', 'quota', 'billing', 'api key']):
-                print("Claude API: Critical error, switching to simulation mode")
+                self._safe_log("Claude API: Critical error, switching to simulation mode", 'warning')
                 self.simulation_mode = True
                 return self._simulate_response(prompt)
             else:
                 # For other errors, try simulation as fallback
-                print("Claude API: Temporary error, using simulation fallback")
+                self._safe_log("Claude API: Temporary error, using simulation fallback", 'info')
                 return self._simulate_response(prompt)
     
     def _simulate_response(self, prompt: str) -> str:
