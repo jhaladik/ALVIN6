@@ -1,0 +1,28 @@
+# requirements-dev.txt - Development Dependencies
+# Core application requirements
+-r requirements.txt
+
+# Development tools
+pytest==7.4.3
+pytest-flask==1.3.0
+pytest-cov==4.1.0
+black==23.11.0
+flake8==6.1.0
+isort==5.12.0
+mypy==1.7.1
+
+# Database tools
+alembic==1.13.1
+flask-migrate==4.0.5
+
+# Testing utilities
+factory-boy==3.3.0
+faker==20.1.0
+coverage==7.3.2
+
+# Development server
+watchdog==3.0.0
+
+# API documentation
+flask-restx==1.3.0
+swagger-ui-bundle==0.0.9

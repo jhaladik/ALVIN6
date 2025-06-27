@@ -1,47 +1,106 @@
-# docker-compose.yml - Development Environment
+# docker-compose.yml - Development and Production Deployment
 version: '3.8'
 
 services:
-  app:
+  # Main Flask Application
+  web:
     build: .
     ports:
       - "5000:5000"
     environment:
+      - FLASK_ENV=development
       - FLASK_CONFIG=development
-      - DATABASE_URL=postgresql://postgres:password@db:5432/storyforge
+      - DATABASE_URL=postgresql://storyforge:password@db:5432/storyforge_dev
       - REDIS_URL=redis://redis:6379/0
+      - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY}
+      - STRIPE_SECRET_KEY=${STRIPE_SECRET_KEY}
+      - STRIPE_PUBLISHABLE_KEY=${STRIPE_PUBLISHABLE_KEY}
+      - SECRET_KEY=${SECRET_KEY}
     volumes:
       - .:/app
-      - ./uploads:/app/uploads
+      - ./static:/app/static
+      - ./frontend:/app/frontend
     depends_on:
       - db
       - redis
+    restart: unless-stopped
     command: python run.py
 
+  # PostgreSQL Database
   db:
-    image: postgres:15
+    image: postgres:15-alpine
     environment:
-      - POSTGRES_DB=storyforge
-      - POSTGRES_USER=postgres
+      - POSTGRES_DB=storyforge_dev
+      - POSTGRES_USER=storyforge
       - POSTGRES_PASSWORD=password
     volumes:
       - postgres_data:/var/lib/postgresql/data
+      - ./init.sql:/docker-entrypoint-initdb.d/init.sql
     ports:
       - "5432:5432"
+    restart: unless-stopped
 
+  # Redis for Caching and Sessions
   redis:
     image: redis:7-alpine
     ports:
       - "6379:6379"
+    volumes:
+      - redis_data:/data
+    restart: unless-stopped
+    command: redis-server --appendonly yes
 
+  # Nginx Reverse Proxy (Production)
   nginx:
     image: nginx:alpine
     ports:
       - "80:80"
+      - "443:443"
     volumes:
       - ./nginx.conf:/etc/nginx/nginx.conf
+      - ./ssl:/etc/nginx/ssl
+      - ./static:/var/www/static
     depends_on:
-      - app
+      - web
+    restart: unless-stopped
+    profiles:
+      - production
+
+  # Celery Worker for Background Tasks
+  worker:
+    build: .
+    environment:
+      - FLASK_ENV=development
+      - DATABASE_URL=postgresql://storyforge:password@db:5432/storyforge_dev
+      - REDIS_URL=redis://redis:6379/0
+      - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY}
+    volumes:
+      - .:/app
+    depends_on:
+      - db
+      - redis
+    restart: unless-stopped
+    command: celery -A app.celery worker --loglevel=info
+    profiles:
+      - production
+
+  # Celery Beat Scheduler
+  scheduler:
+    build: .
+    environment:
+      - FLASK_ENV=development
+      - DATABASE_URL=postgresql://storyforge:password@db:5432/storyforge_dev
+      - REDIS_URL=redis://redis:6379/0
+    volumes:
+      - .:/app
+    depends_on:
+      - db
+      - redis
+    restart: unless-stopped
+    command: celery -A app.celery beat --loglevel=info
+    profiles:
+      - production
 
 volumes:
   postgres_data:
+  redis_data:

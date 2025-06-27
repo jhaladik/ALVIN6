@@ -1,0 +1,515 @@
+<!-- Story Phase UI -->
+<div id="story-phase-content" class="hidden space-y-6">
+    <!-- Story Generation Header -->
+    <div class="bg-white rounded-xl shadow-lg p-6">
+        <div class="flex items-center justify-between mb-6">
+            <div>
+                <h2 class="text-2xl font-bold text-gray-800">Finální příběh</h2>
+                <p class="text-gray-600">Vygenerujte a upravte svůj dokončený příběh</p>
+            </div>
+            <div class="flex space-x-3">
+                <button onclick="generateFinalStory()" class="bg-purple-500 text-white px-4 py-2 rounded-lg hover:bg-purple-600 flex items-center gap-2">
+                    <span>✨</span> Generovat příběh
+                </button>
+                <button onclick="exportStory()" class="bg-green-500 text-white px-4 py-2 rounded-lg hover:bg-green-600 flex items-center gap-2">
+                    <span>📄</span> Export
+                </button>
+                <button onclick="shareStory()" class="bg-blue-500 text-white px-4 py-2 rounded-lg hover:bg-blue-600 flex items-center gap-2">
+                    <span>🔗</span> Sdílet
+                </button>
+            </div>
+        </div>
+        
+        <!-- Story Stats -->
+        <div class="grid grid-cols-2 md:grid-cols-5 gap-4 text-center">
+            <div class="bg-purple-50 p-4 rounded-lg">
+                <div class="text-2xl font-bold text-purple-600" id="story-word-count">0</div>
+                <div class="text-sm text-purple-800">Slov</div>
+            </div>
+            <div class="bg-blue-50 p-4 rounded-lg">
+                <div class="text-2xl font-bold text-blue-600" id="story-pages">0</div>
+                <div class="text-sm text-blue-800">Stran</div>
+            </div>
+            <div class="bg-green-50 p-4 rounded-lg">
+                <div class="text-2xl font-bold text-green-600" id="reading-time">0</div>
+                <div class="text-sm text-green-800">Min čtení</div>
+            </div>
+            <div class="bg-yellow-50 p-4 rounded-lg">
+                <div class="text-2xl font-bold text-yellow-600" id="marketability-score">0</div>
+                <div class="text-sm text-yellow-800">Market. skóre</div>
+            </div>
+            <div class="bg-red-50 p-4 rounded-lg">
+                <div class="text-2xl font-bold text-red-600" id="overall-quality">0</div>
+                <div class="text-sm text-red-800">Kvalita</div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Story Content -->
+    <div class="bg-white rounded-xl shadow-lg">
+        <div class="p-6 border-b border-gray-200">
+            <div class="flex items-center justify-between">
+                <div>
+                    <h3 class="text-xl font-bold text-gray-800" id="final-story-title">Váš příběh</h3>
+                    <p class="text-gray-600" id="story-subtitle">Upravte a dokončete svůj příběh</p>
+                </div>
+                <div class="flex space-x-2">
+                    <button onclick="toggleEditMode()" class="px-3 py-1 rounded text-sm bg-gray-100 hover:bg-gray-200" id="edit-mode-btn">
+                        ✏️ Editovat
+                    </button>
+                    <button onclick="togglePreviewMode()" class="px-3 py-1 rounded text-sm bg-gray-100 hover:bg-gray-200" id="preview-mode-btn">
+                        👁️ Náhled
+                    </button>
+                    <button onclick="toggleFullscreen()" class="px-3 py-1 rounded text-sm bg-gray-100 hover:bg-gray-200">
+                        🔍 Celá obrazovka
+                    </button>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Story Editor -->
+        <div id="story-editor" class="p-6">
+            <div id="story-loading" class="text-center py-12 hidden">
+                <div class="animate-spin rounded-full h-12 w-12 border-b-2 border-purple-600 mx-auto mb-4"></div>
+                <p class="text-gray-600">Generuji váš příběh...</p>
+                <div class="mt-4">
+                    <div class="bg-gray-200 rounded-full h-2 max-w-md mx-auto">
+                        <div id="generation-progress" class="bg-purple-600 h-2 rounded-full transition-all duration-300" style="width: 0%"></div>
+                    </div>
+                    <p class="text-sm text-gray-500 mt-2" id="generation-status">Příprava...</p>
+                </div>
+            </div>
+            
+            <div id="story-content" class="hidden">
+                <!-- Story will be populated here -->
+                <div class="prose max-w-none">
+                    <div id="story-text" class="min-h-96 p-6 border border-gray-200 rounded-lg">
+                        <p class="text-gray-500 text-center">Příběh ještě nebyl vygenerován.</p>
+                    </div>
+                </div>
+            </div>
+            
+            <div id="story-metadata" class="hidden mt-6 p-4 bg-gray-50 rounded-lg">
+                <h4 class="font-semibold text-gray-800 mb-3">Metadata příběhu</h4>
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
+                    <div>
+                        <strong>Žánr:</strong> <span id="meta-genre">-</span>
+                    </div>
+                    <div>
+                        <strong>Téma:</strong> <span id="meta-theme">-</span>
+                    </div>
+                    <div>
+                        <strong>Cílová skupina:</strong> <span id="meta-audience">-</span>
+                    </div>
+                    <div>
+                        <strong>Tón:</strong> <span id="meta-tone">-</span>
+                    </div>
+                    <div>
+                        <strong>Klíčové prvky:</strong> <span id="meta-elements">-</span>
+                    </div>
+                    <div>
+                        <strong>Symboly:</strong> <span id="meta-symbols">-</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Export Options -->
+    <div id="export-panel" class="hidden bg-white rounded-xl shadow-lg p-6">
+        <h3 class="text-xl font-bold text-gray-800 mb-4">Export možnosti</h3>
+        
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+            <div class="export-option p-4 border border-gray-200 rounded-lg hover:border-blue-300 cursor-pointer" onclick="exportFormat('pdf')">
+                <div class="text-center">
+                    <div class="text-3xl mb-2">📄</div>
+                    <h4 class="font-semibold">PDF</h4>
+                    <p class="text-sm text-gray-600">Profesionální formát pro tisk</p>
+                </div>
+            </div>
+            
+            <div class="export-option p-4 border border-gray-200 rounded-lg hover:border-blue-300 cursor-pointer" onclick="exportFormat('docx')">
+                <div class="text-center">
+                    <div class="text-3xl mb-2">📝</div>
+                    <h4 class="font-semibold">DOCX</h4>
+                    <p class="text-sm text-gray-600">Microsoft Word dokument</p>
+                </div>
+            </div>
+            
+            <div class="export-option p-4 border border-gray-200 rounded-lg hover:border-blue-300 cursor-pointer" onclick="exportFormat('epub')">
+                <div class="text-center">
+                    <div class="text-3xl mb-2">📚</div>
+                    <h4 class="font-semibold">EPUB</h4>
+                    <p class="text-sm text-gray-600">E-book formát</p>
+                </div>
+            </div>
+        </div>
+        
+        <div class="mt-6 p-4 bg-blue-50 rounded-lg">
+            <h5 class="font-semibold text-blue-800 mb-2">Export nastavení</h5>
+            <div class="space-y-3">
+                <label class="flex items-center space-x-2">
+                    <input type="checkbox" id="include-metadata" checked class="rounded">
+                    <span class="text-sm">Zahrnout metadata</span>
+                </label>
+                <label class="flex items-center space-x-2">
+                    <input type="checkbox" id="include-scenes" checked class="rounded">
+                    <span class="text-sm">Zahrnout detaily scén</span>
+                </label>
+                <label class="flex items-center space-x-2">
+                    <input type="checkbox" id="include-objects" class="rounded">
+                    <span class="text-sm">Zahrnout seznam objektů</span>
+                </label>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Project List Modal -->
+<div id="project-list-modal" class="hidden fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+    <div class="bg-white rounded-2xl shadow-2xl w-full max-w-4xl mx-4 max-h-90vh overflow-hidden">
+        <div class="p-6 border-b border-gray-200">
+            <div class="flex items-center justify-between">
+                <h2 class="text-2xl font-bold text-gray-800">Moje projekty</h2>
+                <div class="flex items-center space-x-3">
+                    <button onclick="createNewProject()" class="bg-blue-500 text-white px-4 py-2 rounded-lg hover:bg-blue-600">
+                        ➕ Nový projekt
+                    </button>
+                    <button onclick="closeProjectList()" class="text-gray-500 hover:text-gray-700">✕</button>
+                </div>
+            </div>
+            
+            <!-- Search and Filters -->
+            <div class="mt-4 flex items-center space-x-4">
+                <div class="flex-1">
+                    <input type="text" id="project-search" placeholder="Hledat projekty..." 
+                           class="w-full p-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500">
+                </div>
+                <select id="project-filter" class="p-2 border border-gray-300 rounded-lg">
+                    <option value="all">Všechny projekty</option>
+                    <option value="active">Aktivní</option>
+                    <option value="idea">Fáze nápad</option>
+                    <option value="expand">Fáze expanze</option>
+                    <option value="story">Fáze příběh</option>
+                </select>
+                <select id="project-sort" class="p-2 border border-gray-300 rounded-lg">
+                    <option value="updated">Poslední změny</option>
+                    <option value="created">Datum vytvoření</option>
+                    <option value="title">Název A-Z</option>
+                    <option value="genre">Žánr</option>
+                </select>
+            </div>
+        </div>
+        
+        <div class="p-6 overflow-y-auto max-h-96">
+            <div id="projects-grid" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                <!-- Projects will be populated here -->
+                <div id="no-projects" class="col-span-full text-center py-12 hidden">
+                    <div class="text-4xl mb-4">📝</div>
+                    <h3 class="text-xl font-semibold text-gray-800 mb-2">Žádné projekty</h3>
+                    <p class="text-gray-600 mb-4">Začněte svou tvůrčí cestu vytvořením prvního projektu</p>
+                    <button onclick="createNewProject()" class="bg-blue-500 text-white px-6 py-3 rounded-lg hover:bg-blue-600">
+                        Vytvořit první projekt
+                    </button>
+                </div>
+            </div>
+            
+            <div id="projects-loading" class="text-center py-12 hidden">
+                <div class="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto mb-4"></div>
+                <p class="text-gray-600">Načítám projekty...</p>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Settings Modal -->
+<div id="settings-modal" class="hidden fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+    <div class="bg-white rounded-2xl shadow-2xl w-full max-w-3xl mx-4 max-h-90vh overflow-hidden">
+        <div class="p-6 border-b border-gray-200">
+            <div class="flex items-center justify-between">
+                <h2 class="text-2xl font-bold text-gray-800">Nastavení</h2>
+                <button onclick="closeSettings()" class="text-gray-500 hover:text-gray-700">✕</button>
+            </div>
+        </div>
+        
+        <div class="flex">
+            <!-- Settings Navigation -->
+            <div class="w-48 bg-gray-50 p-4">
+                <nav class="space-y-2">
+                    <button onclick="showSettingsTab('account')" class="settings-tab w-full text-left p-2 rounded hover:bg-gray-100 active" data-tab="account">
+                        👤 Účet
+                    </button>
+                    <button onclick="showSettingsTab('billing')" class="settings-tab w-full text-left p-2 rounded hover:bg-gray-100" data-tab="billing">
+                        💳 Billing
+                    </button>
+                    <button onclick="showSettingsTab('ai')" class="settings-tab w-full text-left p-2 rounded hover:bg-gray-100" data-tab="ai">
+                        🤖 AI nastavení
+                    </button>
+                    <button onclick="showSettingsTab('collaboration')" class="settings-tab w-full text-left p-2 rounded hover:bg-gray-100" data-tab="collaboration">
+                        👥 Spolupráce
+                    </button>
+                    <button onclick="showSettingsTab('export')" class="settings-tab w-full text-left p-2 rounded hover:bg-gray-100" data-tab="export">
+                        📤 Export
+                    </button>
+                </nav>
+            </div>
+            
+            <!-- Settings Content -->
+            <div class="flex-1 p-6 overflow-y-auto max-h-96">
+                <!-- Account Settings -->
+                <div id="account-settings" class="settings-content">
+                    <h3 class="text-lg font-semibold mb-4">Nastavení účtu</h3>
+                    
+                    <div class="space-y-4">
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-1">Uživatelské jméno</label>
+                            <input type="text" id="username-input" class="w-full p-3 border border-gray-300 rounded-lg">
+                        </div>
+                        
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-1">Email</label>
+                            <input type="email" id="email-input" class="w-full p-3 border border-gray-300 rounded-lg">
+                        </div>
+                        
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-1">Nové heslo</label>
+                            <input type="password" id="password-input" placeholder="Ponechte prázdné pro nezměněno" class="w-full p-3 border border-gray-300 rounded-lg">
+                        </div>
+                        
+                        <button onclick="saveAccountSettings()" class="bg-blue-500 text-white px-4 py-2 rounded-lg hover:bg-blue-600">
+                            Uložit změny
+                        </button>
+                    </div>
+                </div>
+                
+                <!-- Billing Settings -->
+                <div id="billing-settings" class="settings-content hidden">
+                    <h3 class="text-lg font-semibold mb-4">Billing & Předplatné</h3>
+                    
+                    <div id="current-plan" class="mb-6 p-4 bg-blue-50 rounded-lg">
+                        <!-- Current plan info will be populated -->
+                    </div>
+                    
+                    <div id="usage-analytics" class="mb-6">
+                        <h4 class="font-semibold mb-3">Využití tokenů</h4>
+                        <div class="bg-gray-50 rounded-lg p-4">
+                            <!-- Usage chart will be here -->
+                            <div id="token-usage-chart" class="h-32 bg-white rounded border">
+                                <p class="text-center text-gray-500 leading-32">Graf využití tokenů</p>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="space-x-3">
+                        <button onclick="upgradePlan()" class="bg-green-500 text-white px-4 py-2 rounded-lg hover:bg-green-600">
+                            Upgrade plán
+                        </button>
+                        <button onclick="buyTokens()" class="bg-purple-500 text-white px-4 py-2 rounded-lg hover:bg-purple-600">
+                            Koupit tokeny
+                        </button>
+                        <button onclick="viewBillingHistory()" class="bg-gray-500 text-white px-4 py-2 rounded-lg hover:bg-gray-600">
+                            Historie plateb
+                        </button>
+                    </div>
+                </div>
+                
+                <!-- AI Settings -->
+                <div id="ai-settings" class="settings-content hidden">
+                    <h3 class="text-lg font-semibold mb-4">AI nastavení</h3>
+                    
+                    <div class="space-y-4">
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-2">Preferovaný AI model</label>
+                            <select id="ai-model-select" class="w-full p-3 border border-gray-300 rounded-lg">
+                                <option value="claude-3-5-sonnet">Claude 3.5 Sonnet (Doporučeno)</option>
+                                <option value="claude-3-opus">Claude 3 Opus (Nejlepší kvalita)</option>
+                                <option value="claude-3-haiku">Claude 3 Haiku (Rychlý)</option>
+                            </select>
+                        </div>
+                        
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-2">Kreativita AI</label>
+                            <input type="range" id="creativity-slider" min="0" max="1" step="0.1" value="0.7" class="w-full">
+                            <div class="flex justify-between text-sm text-gray-500">
+                                <span>Konzervativní</span>
+                                <span>Vyvážené</span>
+                                <span>Kreativní</span>
+                            </div>
+                        </div>
+                        
+                        <div>
+                            <label class="flex items-center space-x-2">
+                                <input type="checkbox" id="auto-suggestions" checked class="rounded">
+                                <span class="text-sm">Automatické návrhy scén</span>
+                            </label>
+                        </div>
+                        
+                        <div>
+                            <label class="flex items-center space-x-2">
+                                <input type="checkbox" id="real-time-analysis" class="rounded">
+                                <span class="text-sm">Real-time analýza při psaní</span>
+                            </label>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Collaboration Settings -->
+                <div id="collaboration-settings" class="settings-content hidden">
+                    <h3 class="text-lg font-semibold mb-4">Nastavení spolupráce</h3>
+                    
+                    <div class="space-y-4">
+                        <div>
+                            <label class="flex items-center space-x-2">
+                                <input type="checkbox" id="allow-invitations" checked class="rounded">
+                                <span class="text-sm">Povolit pozvání ke spolupráci</span>
+                            </label>
+                        </div>
+                        
+                        <div>
+                            <label class="flex items-center space-x-2">
+                                <input type="checkbox" id="show-presence" checked class="rounded">
+                                <span class="text-sm">Zobrazovat mou online přítomnost</span>
+                            </label>
+                        </div>
+                        
+                        <div>
+                            <label class="flex items-center space-x-2">
+                                <input type="checkbox" id="email-notifications" checked class="rounded">
+                                <span class="text-sm">Email notifikace pro komentáře</span>
+                            </label>
+                        </div>
+                        
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-2">Defaultní role pro nové spolupracovníky</label>
+                            <select id="default-role" class="w-full p-3 border border-gray-300 rounded-lg">
+                                <option value="viewer">Prohlížeč</option>
+                                <option value="commenter">Komentátor</option>
+                                <option value="editor">Editor</option>
+                            </select>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Export Settings -->
+                <div id="export-settings" class="settings-content hidden">
+                    <h3 class="text-lg font-semibold mb-4">Export předvolby</h3>
+                    
+                    <div class="space-y-4">
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-2">Preferovaný formát</label>
+                            <select id="default-export-format" class="w-full p-3 border border-gray-300 rounded-lg">
+                                <option value="pdf">PDF</option>
+                                <option value="docx">DOCX</option>
+                                <option value="epub">EPUB</option>
+                                <option value="txt">Plain text</option>
+                            </select>
+                        </div>
+                        
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-2">Písmo</label>
+                            <select id="export-font" class="w-full p-3 border border-gray-300 rounded-lg">
+                                <option value="times">Times New Roman</option>
+                                <option value="arial">Arial</option>
+                                <option value="calibri">Calibri</option>
+                                <option value="georgia">Georgia</option>
+                            </select>
+                        </div>
+                        
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-2">Velikost písma</label>
+                            <select id="font-size" class="w-full p-3 border border-gray-300 rounded-lg">
+                                <option value="10">10pt</option>
+                                <option value="11">11pt</option>
+                                <option value="12" selected>12pt</option>
+                                <option value="14">14pt</option>
+                                <option value="16">16pt</option>
+                            </select>
+                        </div>
+                        
+                        <div>
+                            <label class="flex items-center space-x-2">
+                                <input type="checkbox" id="include-cover" checked class="rounded">
+                                <span class="text-sm">Zahrnout titulní stránku</span>
+                            </label>
+                        </div>
+                        
+                        <div>
+                            <label class="flex items-center space-x-2">
+                                <input type="checkbox" id="include-toc" class="rounded">
+                                <span class="text-sm">Zahrnout obsah</span>
+                            </label>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<style>
+.export-option:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+}
+
+.settings-tab.active {
+    background-color: #3B82F6;
+    color: white;
+}
+
+.line-clamp-2 {
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+}
+
+.line-clamp-3 {
+    display: -webkit-box;
+    -webkit-line-clamp: 3;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+}
+
+.max-h-90vh {
+    max-height: 90vh;
+}
+
+.leading-32 {
+    line-height: 8rem;
+}
+
+#story-text {
+    font-family: 'Georgia', serif;
+    line-height: 1.8;
+    font-size: 16px;
+}
+
+.prose {
+    color: #374151;
+}
+
+.prose h1, .prose h2, .prose h3 {
+    color: #1F2937;
+}
+
+.generation-step {
+    padding: 8px;
+    margin: 4px 0;
+    border-radius: 4px;
+    background: #F3F4F6;
+    border-left: 4px solid #6B7280;
+}
+
+.generation-step.active {
+    background: #EBF8FF;
+    border-left-color: #3B82F6;
+    color: #1E40AF;
+}
+
+.generation-step.completed {
+    background: #F0FDF4;
+    border-left-color: #10B981;
+    color: #065F46;
+}
+</style>
