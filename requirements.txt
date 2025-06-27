@@ -1,14 +1,45 @@
-# requirements.txt - UPDATED with specific compatible versions
+# requirements.txt - StoryForge AI Dependencies
+
+# Core Flask Framework
 Flask==2.3.3
 Flask-SQLAlchemy==3.0.5
 Flask-CORS==4.0.0
 Flask-SocketIO==5.3.6
 python-socketio==5.8.0
 Werkzeug==2.3.7
-python-dotenv==1.0.0
-click==8.1.7
-requests==2.31.0
 
-# Claude API - use compatible version
+# Database
+SQLAlchemy==2.0.23
+psycopg2-binary==2.9.9
+
+# Redis for Caching and Sessions
+redis==5.0.1
+
+# AI and ML Services
 anthropic==0.25.1
 tiktoken==0.5.2
+
+# Payment Processing
+stripe==7.8.0
+
+# HTTP and API
+requests==2.31.0
+
+# Security and Validation
+cryptography==41.0.7
+bcrypt==4.1.2
+python-dotenv==1.0.0
+
+# Utilities
+click==8.1.7
+python-dateutil==2.8.2
+
+# File Processing for Export
+reportlab==4.0.7
+python-docx==0.8.11
+
+# Development and Production Server
+gunicorn==21.2.0
+
+# Environment Configuration
+python-decouple==3.8
