@@ -4,7 +4,7 @@ from app.ai import ai_bp
 from app.models import Project, Scene, StoryObject
 from app.utils.auth import login_required, track_ai_operation, enhanced_token_check
 from app.services.ai_analyzer import AIAnalyzer
-from app.services.enhanced_ai_critics import EnhancedAICritics
+from app.services.ai_critics import EnhancedAICritics
 from app.services.token_manager import token_manager
 from app import db
 import time

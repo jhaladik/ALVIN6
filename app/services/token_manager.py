@@ -124,7 +124,7 @@ class TokenManager:
             'output_tokens': operation.output_tokens,
             'total_cost': operation.total_cost,
             'multiplier': operation.multiplier,
-            'metadata': operation.metadata
+            'operation_metadata': operation.metadata
         }
         
         self.operations_log.append(log_entry)

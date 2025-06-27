@@ -231,7 +231,7 @@ class TokenUsageLog(db.Model):
     scene_id = db.Column(db.Integer, db.ForeignKey('scene.id'), index=True)
     
     # Metadata
-    metadata = db.Column(db.JSON)
+    operation_metadata = db.Column(db.JSON)
     ai_model_used = db.Column(db.String(50))
     response_time_ms = db.Column(db.Integer)
     
@@ -257,6 +257,7 @@ class TokenUsageLog(db.Model):
             'scene_id': self.scene_id,
             'ai_model_used': self.ai_model_used,
             'response_time_ms': self.response_time_ms,
+            'operation_metadata': self.operation_metadata,  # Updated name
             'created_at': self.created_at.isoformat() if self.created_at else None
         }
 

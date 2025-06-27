@@ -66,3 +66,71 @@
     from { opacity: 0; transform: translateY(20px); }
     to { opacity: 1; transform: translateY(0); }
 }
+
+/* Additional styles for expand phase */
+.scene-node {
+    min-width: 200px;
+    max-width: 250px;
+    transition: all 0.3s ease;
+    cursor: pointer;
+}
+
+.scene-node:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 8px 25px rgba(0,0,0,0.15);
+}
+
+.scene-node.active {
+    border: 2px solid #3B82F6;
+    box-shadow: 0 0 20px rgba(59, 130, 246, 0.3);
+}
+
+.kanban-column {
+    min-height: 300px;
+}
+
+.kanban-scene {
+    transition: all 0.2s ease;
+}
+
+.kanban-scene:hover {
+    transform: scale(1.02);
+}
+
+.intensity-indicator {
+    height: 4px;
+    border-radius: 2px;
+    transition: all 0.3s ease;
+}
+
+.high-intensity {
+    background: linear-gradient(90deg, #EF4444, #DC2626);
+    animation: intensityPulse 2s infinite;
+}
+
+.medium-intensity {
+    background: linear-gradient(90deg, #F59E0B, #D97706);
+}
+
+.low-intensity {
+    background: linear-gradient(90deg, #10B981, #059669);
+}
+
+@keyframes intensityPulse {
+    0%, 100% { opacity: 0.7; }
+    50% { opacity: 1; }
+}
+
+.line-clamp-2 {
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+}
+
+.line-clamp-3 {
+    display: -webkit-box;
+    -webkit-line-clamp: 3;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+}

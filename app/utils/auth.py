@@ -69,7 +69,7 @@ def execute_token_operation(operation_type: str, user_id: int, input_tokens: int
         user_id=user_id,
         input_tokens=input_tokens,
         output_tokens=output_tokens,
-        metadata=metadata
+        operation_metadata=metadata
     )
     
     # Execute the operation

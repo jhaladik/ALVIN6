@@ -99,81 +99,78 @@ Buďte kreativní ale zůstaňte věrní původnímu nápadu."""
             # Fallback analysis
             return self._fallback_idea_analysis(idea_text, story_intent)
     
-    def _validate_idea_analysis(self, result: Dict) -> None:
-        """Validate and fix idea analysis structure"""
-        # Ensure main sections exist
-        if 'story_assessment' not in result:
-            result['story_assessment'] = {}
-        if 'extracted_objects' not in result:
-            result['extracted_objects'] = {}
-        if 'first_scene_suggestion' not in result:
-            result['first_scene_suggestion'] = {}
-        if 'project_suggestions' not in result:
-            result['project_suggestions'] = {}
-        if 'next_steps' not in result:
-            result['next_steps'] = {}
+def _validate_idea_analysis(self, result: Dict) -> None:
+    """Validate and fix idea analysis structure - ROBUST VERSION"""
+    
+    # --- Validace 'story_assessment' ---
+    story_defaults = {
+        'genre': 'drama',
+        'tone': 'balanced',
+        'target_audience': 'general',
+        'estimated_scope': 'short-story',
+        'themes': [],
+        'marketability': 3
+    }
+    # Nejdříve zajisti, že 'story_assessment' existuje a je to slovník (dict)
+    if 'story_assessment' not in result or not isinstance(result.get('story_assessment'), dict):
+        result['story_assessment'] = {}
+    # Až teď bezpečně doplň chybějící podklíče
+    for key, default in story_defaults.items():
+        result['story_assessment'].setdefault(key, default)
+
+    # --- Validace 'extracted_objects' ---
+    object_defaults = {
+        'characters': [],
+        'locations': [],
+        'objects': [],
+        'conflicts': []
+    }
+    if 'extracted_objects' not in result or not isinstance(result.get('extracted_objects'), dict):
+        result['extracted_objects'] = {}
+    for key, default in object_defaults.items():
+        result['extracted_objects'].setdefault(key, default)
+        # Dodatečná kontrola, zda je hodnota seznam (list)
+        if not isinstance(result['extracted_objects'][key], list):
+            result['extracted_objects'][key] = []
+    
+    # --- Validace 'first_scene_suggestion' ---
+    scene_defaults = {
+        'title': 'Úvodní scéna',
+        'description': 'Úvodní scéna příběhu',
+        'scene_type': 'opening',
+        'location': '',
+        'objects': [],
+        'hook': '',
+        'conflict': ''
+    }
+    if 'first_scene_suggestion' not in result or not isinstance(result.get('first_scene_suggestion'), dict):
+        result['first_scene_suggestion'] = {}
+    for key, default in scene_defaults.items():
+        result['first_scene_suggestion'].setdefault(key, default)
+
+    # --- Validace 'project_suggestions' ---
+    project_defaults = {
+        'title': 'Nový projekt',
+        'description': 'Příběh vytvořený z nápadu',
+        'target_length': '10000'
+    }
+    if 'project_suggestions' not in result or not isinstance(result.get('project_suggestions'), dict):
+        result['project_suggestions'] = {}
+    for key, default in project_defaults.items():
+        result['project_suggestions'].setdefault(key, default)
         
-        # Validate story_assessment
-        story_defaults = {
-            'genre': 'drama',
-            'tone': 'balanced',
-            'target_audience': 'general',
-            'estimated_scope': 'short-story',
-            'themes': [],
-            'marketability': 3
-        }
-        for key, default in story_defaults.items():
-            if key not in result['story_assessment']:
-                result['story_assessment'][key] = default
-        
-        # Validate extracted_objects
-        object_defaults = {
-            'characters': [],
-            'locations': [],
-            'objects': [],
-            'conflicts': []
-        }
-        for key, default in object_defaults.items():
-            if key not in result['extracted_objects']:
-                result['extracted_objects'][key] = default
-            elif not isinstance(result['extracted_objects'][key], list):
-                result['extracted_objects'][key] = []
-        
-        # Validate first_scene_suggestion
-        scene_defaults = {
-            'title': 'Úvodní scéna',
-            'description': 'Úvodní scéna příběhu',
-            'scene_type': 'opening',
-            'location': '',
-            'objects': [],
-            'hook': '',
-            'conflict': ''
-        }
-        for key, default in scene_defaults.items():
-            if key not in result['first_scene_suggestion']:
-                result['first_scene_suggestion'][key] = default
-        
-        # Validate project_suggestions
-        project_defaults = {
-            'title': 'Nový projekt',
-            'description': 'Příběh vytvořený z nápadu',
-            'target_length': '10000'
-        }
-        for key, default in project_defaults.items():
-            if key not in result['project_suggestions']:
-                result['project_suggestions'][key] = default
-        
-        # Validate next_steps
-        steps_defaults = {
-            'immediate_actions': [],
-            'development_areas': [],
-            'potential_subplots': []
-        }
-        for key, default in steps_defaults.items():
-            if key not in result['next_steps']:
-                result['next_steps'][key] = default
-            elif not isinstance(result['next_steps'][key], list):
-                result['next_steps'][key] = []
+    # --- Validace 'next_steps' ---
+    steps_defaults = {
+        'immediate_actions': [],
+        'development_areas': [],
+        'potential_subplots': []
+    }
+    if 'next_steps' not in result or not isinstance(result.get('next_steps'), dict):
+        result['next_steps'] = {}
+    for key, default in steps_defaults.items():
+        result['next_steps'].setdefault(key, default)
+        if not isinstance(result['next_steps'][key], list):
+            result['next_steps'][key] = []
     
     def _fallback_idea_analysis(self, idea_text: str, story_intent: str = None) -> Dict:
         """Fallback idea analysis using simple text processing"""

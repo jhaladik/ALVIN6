@@ -160,7 +160,7 @@ def upgrade():
         sa.Column('multiplier', sa.Float(), nullable=True),
         sa.Column('project_id', sa.String(length=36), nullable=True),
         sa.Column('scene_id', sa.Integer(), nullable=True),
-        sa.Column('metadata', sa.JSON(), nullable=True),
+        sa.Column('operation_metadata', sa.JSON(), nullable=True),
         sa.Column('ai_model_used', sa.String(length=50), nullable=True),
         sa.Column('response_time_ms', sa.Integer(), nullable=True),
         sa.Column('billable', sa.Boolean(), nullable=True),

@@ -1,4 +1,4 @@
-# app/__init__.py - OPRAVENÝ App Factory (bez main blueprint)
+# app/__init__.py - FIXED App Factory with proper static file handling
 from flask import Flask, render_template, send_from_directory, jsonify
 from flask_sqlalchemy import SQLAlchemy
 from flask_cors import CORS
@@ -11,7 +11,22 @@ socketio = SocketIO()
 
 def create_app(config_name='development'):
     """Application factory pattern"""
-    app = Flask(__name__)
+    
+    # Get the directory where this file is located (app directory)
+    app_dir = os.path.dirname(os.path.abspath(__file__))
+    # Get the project root directory (parent of app directory)
+    project_root = os.path.dirname(app_dir)
+    # Set static folder path
+    static_folder = os.path.join(project_root, 'static')
+    
+    app = Flask(__name__, 
+                static_folder=static_folder,
+                static_url_path='/static')
+    
+    print(f"📁 App directory: {app_dir}")
+    print(f"📁 Project root: {project_root}")
+    print(f"📁 Static folder: {static_folder}")
+    print(f"📁 Static folder exists: {os.path.exists(static_folder)}")
     
     # Load configuration
     from config import config
@@ -41,11 +56,11 @@ def create_app(config_name='development'):
         """Serve the main frontend application"""
         try:
             # Try to serve the HTML file directly from frontend folder
-            frontend_path = os.path.join(app.root_path, '..', 'frontend')
+            frontend_path = os.path.join(project_root, 'frontend')
             if os.path.exists(os.path.join(frontend_path, 'index.html')):
                 return send_from_directory(frontend_path, 'index.html')
-        except:
-            pass
+        except Exception as e:
+            print(f"Error serving frontend: {e}")
         
         # If file doesn't exist, show a simple API info page
         return '''
@@ -98,57 +113,37 @@ def create_app(config_name='development'):
                 <div class="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
                     <h3 class="font-medium text-yellow-800 mb-2">📁 Frontend Setup</h3>
                     <p class="text-sm text-yellow-700">
-                        Pro zobrazení frontendu vytvořte soubor <code class="bg-yellow-100 px-1 rounded">frontend/index.html</code>
+                        Frontend: {frontend_path}<br/>
+                        Static files: {static_folder}
                     </p>
                 </div>
             </div>
-            
-            <script>
-                // Test API connection
-                async function testAPI() {
-                    try {
-                        const response = await fetch('/api');
-                        const data = await response.json();
-                        console.log('API Response:', data);
-                        alert('API funguje! Zkontrolujte konzoli pro detaily.');
-                    } catch (error) {
-                        console.error('API Error:', error);
-                        alert('Chyba API: ' + error.message);
-                    }
-                }
-                
-                // Add click handler to test button
-                document.addEventListener('DOMContentLoaded', function() {
-                    const testBtn = document.querySelector('a[href="/api"]');
-                    if (testBtn) {
-                        testBtn.addEventListener('click', function(e) {
-                            e.preventDefault();
-                            testAPI();
-                        });
-                    }
-                });
-            </script>
         </body>
         </html>
-        '''
+        '''.format(frontend_path=frontend_path, static_folder=static_folder)
 
     @app.route('/favicon.ico')
     def favicon():
         """Serve favicon"""
         try:
-            return send_from_directory(
-                os.path.join(app.root_path, '..', 'static'),
-                'favicon.ico',
-                mimetype='image/vnd.microsoft.icon'
-            )
+            return send_from_directory(static_folder, 'favicon.ico', mimetype='image/vnd.microsoft.icon')
         except:
             return '', 204
 
+    # Alternative static file route (backup)
     @app.route('/static/<path:filename>')
-    def static_files(filename):
-        """Serve static files"""
-        static_path = os.path.join(app.root_path, '..', 'static')
-        return send_from_directory(static_path, filename)
+    def static_files_backup(filename):
+        """Backup static file route"""
+        try:
+            print(f"🔍 Requesting static file: {filename}")
+            print(f"🔍 Looking in: {static_folder}")
+            print(f"🔍 Full path: {os.path.join(static_folder, filename)}")
+            print(f"🔍 File exists: {os.path.exists(os.path.join(static_folder, filename))}")
+            
+            return send_from_directory(static_folder, filename)
+        except Exception as e:
+            print(f"❌ Static file error: {e}")
+            return f"Static file not found: {filename}", 404
 
     @app.route('/health')
     def health_check():
@@ -157,7 +152,9 @@ def create_app(config_name='development'):
             'status': 'healthy',
             'service': 'StoryForge AI API',
             'version': '1.0.0',
-            'database': 'connected'
+            'database': 'connected',
+            'static_folder': static_folder,
+            'static_folder_exists': os.path.exists(static_folder)
         })
 
     @app.route('/api')
@@ -194,13 +191,17 @@ def create_app(config_name='development'):
                 'password': 'demo123',
                 'plan': 'pro',
                 'tokens': '10000'
+            },
+            'static_info': {
+                'static_folder': static_folder,
+                'static_folder_exists': os.path.exists(static_folder)
             }
         })
 
     @app.route('/frontend')
     def frontend_explicit():
         """Serve frontend explicitly"""
-        frontend_path = os.path.join(app.root_path, '..', 'frontend')
+        frontend_path = os.path.join(project_root, 'frontend')
         try:
             return send_from_directory(frontend_path, 'index.html')
         except:
@@ -209,6 +210,34 @@ def create_app(config_name='development'):
             <p>Create frontend/index.html to display your frontend application.</p>
             <a href="/">Back to API info</a>
             '''
+    
+    # Debug route to check static files
+    @app.route('/debug/static')
+    def debug_static():
+        """Debug static files"""
+        def list_directory(path, level=0):
+            items = []
+            if os.path.exists(path):
+                for item in os.listdir(path):
+                    item_path = os.path.join(path, item)
+                    indent = "  " * level
+                    if os.path.isdir(item_path):
+                        items.append(f"{indent}{item}/")
+                        items.extend(list_directory(item_path, level + 1))
+                    else:
+                        size = os.path.getsize(item_path)
+                        items.append(f"{indent}{item} ({size} bytes)")
+            return items
+        
+        static_listing = list_directory(static_folder)
+        
+        return f"""
+        <h1>Static Files Debug</h1>
+        <p><strong>Static folder:</strong> {static_folder}</p>
+        <p><strong>Exists:</strong> {os.path.exists(static_folder)}</p>
+        <h2>Directory listing:</h2>
+        <pre>{'<br/>'.join(static_listing) if static_listing else 'Directory empty or not found'}</pre>
+        """
     
     # Register CLI commands
     from app.cli import init_db_command
