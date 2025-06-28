@@ -68,6 +68,18 @@ class StoryForgeAPI {
         }
     }
 
+    // static/js/api.js - Add this to debug API responses
+    async getProjects() { 
+        try {
+            const response = await this.request('/projects');
+            console.log('Raw API response for projects:', response);
+            return response; 
+        } catch (error) {
+            console.error('API error in getProjects:', error);
+            throw error;
+        }
+    }
+
     // Auth methods
     async login(email, password) { return this.request('/auth/login', { method: 'POST', body: { email, password } }); }
     async logout() { return this.request('/auth/logout', { method: 'POST' }); }

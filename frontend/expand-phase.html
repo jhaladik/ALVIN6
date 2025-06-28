@@ -238,7 +238,20 @@
             <!-- Analysis content will be rendered here -->
         </div>
     </div>
-    
+
+    <!-- Add this to your expand-phase-content div in index.html -->
+    <div id="no-project-selected-message" class="bg-yellow-50 border border-yellow-200 rounded-lg p-4 mb-4">
+        <p class="text-yellow-800">Please select a project or create a new one before adding scenes.</p>
+        <div class="mt-2 flex space-x-2">
+            <button onclick="showProjectList()" class="bg-blue-500 text-white px-3 py-1 text-sm rounded hover:bg-blue-600">
+                Select Project
+            </button>
+            <button onclick="createNewProject()" class="bg-green-500 text-white px-3 py-1 text-sm rounded hover:bg-green-600">
+                Create Project
+            </button>
+        </div>
+    </div>
+
     <!-- AI Suggestions Panel -->
     <div id="ai-suggestions-panel" class="hidden bg-white rounded-xl shadow-lg">
         <div class="p-6 border-b border-gray-200">

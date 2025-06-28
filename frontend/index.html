@@ -45,6 +45,47 @@
         </div>
     </div>
 
+    <!-- Project Selection Modal -->
+    <div id="project-list-modal" class="hidden fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+        <div class="bg-white rounded-xl shadow-xl p-6 max-w-3xl w-full max-h-[80vh] flex flex-col">
+            <div class="flex justify-between items-center mb-4">
+                <h3 class="text-xl font-bold text-gray-800">Select Project</h3>
+                <button onclick="closeProjectList()" class="text-gray-500 hover:text-gray-700">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+                    </svg>
+                </button>
+            </div>
+            
+            <div class="flex items-center mb-4 space-x-2">
+                <input type="text" id="project-search" class="flex-1 border border-gray-300 rounded-lg px-3 py-2" placeholder="Search projects...">
+                <select id="project-filter" class="border border-gray-300 rounded-lg px-3 py-2">
+                    <option value="all">All</option>
+                    <option value="recent">Recent</option>
+                    <option value="mine">My Projects</option>
+                </select>
+            </div>
+            
+            <div id="projects-loading" class="py-4 text-center">
+                <div class="animate-spin rounded-full h-8 w-8 border-b-2 border-indigo-600 mx-auto"></div>
+                <p class="text-gray-600 mt-2">Loading projects...</p>
+            </div>
+            
+            <div id="projects-grid" class="grid grid-cols-1 md:grid-cols-2 gap-4 overflow-y-auto flex-grow hidden">
+                <!-- Projects will be dynamically loaded here -->
+            </div>
+            
+            <div class="mt-4 flex justify-between items-center pt-4 border-t border-gray-200">
+                <button onclick="createNewProject()" class="bg-blue-500 text-white px-4 py-2 rounded-lg hover:bg-blue-600">
+                    ✨ New Project
+                </button>
+                <button onclick="closeProjectList()" class="bg-gray-200 text-gray-800 px-4 py-2 rounded-lg hover:bg-gray-300">
+                    Cancel
+                </button>
+            </div>
+        </div>
+    </div>  
+
     <!-- Header -->
     <header class="gradient-bg text-white shadow-xl relative overflow-hidden">
         <div class="absolute inset-0 bg-black opacity-10"></div>
@@ -83,6 +124,23 @@
             </div>
         </div>
     </header>
+
+        <!-- Add this right after the main navigation tabs or before your main content -->
+    <div id="project-status-bar" class="bg-white border-b border-gray-200 px-4 py-2 mb-4 text-sm flex justify-between items-center">
+        <div class="flex items-center">
+            <span class="font-semibold mr-2">Current Project:</span>
+            <span id="current-project-name" class="text-blue-600">No project selected</span>
+            <span id="current-project-id" class="ml-2 text-gray-500 text-xs"></span>
+        </div>
+        <div class="flex items-center">
+            <span class="font-semibold mr-2">Phase:</span>
+            <span id="current-phase-indicator" class="bg-gray-100 px-2 py-1 rounded-full text-xs">idea</span>
+            <button onclick="showProjectList()" class="ml-4 bg-blue-500 text-white text-xs px-2 py-1 rounded hover:bg-blue-600">
+                Switch Project
+            </button>
+        </div>
+    </div>
+
 
     <div class="max-w-7xl mx-auto p-6 space-y-6" id="main-app-container" style="display: none;">
         

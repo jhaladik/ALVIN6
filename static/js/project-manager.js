@@ -10,6 +10,7 @@ class ProjectManager {
         this.setupEventListeners();
     }
     
+    // Setup the event listeners for project filtering and sorting
     setupEventListeners() {
         const searchInput = document.getElementById('project-search');
         if (searchInput) {
@@ -26,169 +27,193 @@ class ProjectManager {
                 this.filterAndSortProjects();
             });
         }
-        
-        const sortSelect = document.getElementById('project-sort');
-        if (sortSelect) {
-            sortSelect.addEventListener('change', (e) => {
-                this.currentSort = e.target.value;
-                this.filterAndSortProjects();
-            });
-        }
     }
     
+    // Load projects from the server
+    // static/js/project-manager.js - Updated loadProjects method
     async loadProjects() {
         try {
             document.getElementById('projects-loading').classList.remove('hidden');
             document.getElementById('projects-grid').classList.add('hidden');
             
+            // Make the API call
             const response = await state.api.getProjects();
-            this.projects = response || [];
             
+            // Debug the response
+            console.log('Project response:', response);
+            
+            // Check if response exists and is properly structured
+            if (!response) {
+                throw new Error('Empty response from server');
+            }
+            
+            // Handle different response formats - the API might return an array directly 
+            // or an object with a projects property
+            if (Array.isArray(response)) {
+                this.projects = response;
+            } else if (response.success && Array.isArray(response.projects)) {
+                this.projects = response.projects;
+            } else if (typeof response === 'object') {
+                // Try to extract projects from the response object
+                this.projects = response.projects || response.data || [];
+            } else {
+                this.projects = [];
+            }
+            
+            console.log('Processed projects:', this.projects);
+            
+            // Even if we have no projects, we should update the UI
             this.filterAndSortProjects();
-            this.renderProjects();
+            
+            document.getElementById('projects-loading').classList.add('hidden');
+            document.getElementById('projects-grid').classList.remove('hidden');
             
         } catch (error) {
-            ui.showToast('Chyba při načítání projektů: ' + error.message, 'error');
-        } finally {
+            console.error('Failed to load projects:', error);
+            ui.showToast('Failed to load projects: ' + error.message, 'error');
+            
             document.getElementById('projects-loading').classList.add('hidden');
+            document.getElementById('projects-grid').innerHTML = `
+                <div class="col-span-2 text-center py-8 text-gray-500">
+                    <p>Failed to load projects: ${error.message}</p>
+                    <button onclick="loadProjects()" class="mt-2 text-blue-500 hover:underline">Retry</button>
+                </div>
+            `;
             document.getElementById('projects-grid').classList.remove('hidden');
         }
     }
     
+    // Filter and sort projects based on user preferences
     filterAndSortProjects() {
         // Filter projects
-        this.filteredProjects = this.projects.filter(project => {
-            // Search filter
-            if (this.searchTerm) {
-                const searchable = `${project.title} ${project.description} ${project.genre}`.toLowerCase();
-                if (!searchable.includes(this.searchTerm)) {
-                    return false;
-                }
-            }
-            
-            // Phase filter
-            if (this.currentFilter !== 'all') {
-                if (this.currentFilter === 'active') {
-                    return project.status === 'active';
-                } else {
-                    return project.current_phase === this.currentFilter;
-                }
-            }
-            
-            return true;
-        });
+        if (this.currentFilter === 'all') {
+            this.filteredProjects = [...this.projects];
+        } else if (this.currentFilter === 'recent') {
+            // Sort by date and take the 10 most recent
+            this.filteredProjects = [...this.projects]
+                .sort((a, b) => new Date(b.updated_at) - new Date(a.updated_at))
+                .slice(0, 10);
+        } else if (this.currentFilter === 'mine') {
+            // Only show projects created by the current user
+            this.filteredProjects = this.projects.filter(p => p.user_id === state.currentUser?.id);
+        }
+        
+        // Apply search filter
+        if (this.searchTerm) {
+            this.filteredProjects = this.filteredProjects.filter(p => 
+                p.title.toLowerCase().includes(this.searchTerm) || 
+                (p.description && p.description.toLowerCase().includes(this.searchTerm))
+            );
+        }
         
         // Sort projects
-        this.filteredProjects.sort((a, b) => {
-            switch (this.currentSort) {
-                case 'updated':
-                    return new Date(b.updated_at || b.created_at) - new Date(a.updated_at || a.created_at);
-                case 'created':
-                    return new Date(b.created_at) - new Date(a.created_at);
-                case 'title':
-                    return a.title.localeCompare(b.title);
-                case 'genre':
-                    return (a.genre || '').localeCompare(b.genre || '');
-                default:
-                    return 0;
-            }
-        });
+        if (this.currentSort === 'title') {
+            this.filteredProjects.sort((a, b) => a.title.localeCompare(b.title));
+        } else if (this.currentSort === 'updated') {
+            this.filteredProjects.sort((a, b) => new Date(b.updated_at) - new Date(a.updated_at));
+        }
         
         this.renderProjects();
     }
     
+    // Render the projects in the grid
     renderProjects() {
-        const grid = document.getElementById('projects-grid');
-        const noProjects = document.getElementById('no-projects');
+        const projectsGrid = document.getElementById('projects-grid');
+        if (!projectsGrid) return;
         
-        if (this.filteredProjects.length === 0) {
-            grid.innerHTML = '';
-            noProjects.classList.remove('hidden');
+        console.log('Rendering projects:', this.filteredProjects);
+        
+        if (!this.filteredProjects || this.filteredProjects.length === 0) {
+            projectsGrid.innerHTML = `
+                <div class="col-span-2 text-center py-8 text-gray-500">
+                    <p>No projects found. Create a new project or change your filters.</p>
+                    <div class="mt-4">
+                        <button onclick="createNewProject()" class="bg-blue-500 text-white px-4 py-2 rounded-lg hover:bg-blue-600">
+                            ✨ Create New Project
+                        </button>
+                    </div>
+                </div>
+            `;
             return;
         }
         
-        noProjects.classList.add('hidden');
+        // Check if the projects have the expected structure
+        const validProjects = this.filteredProjects.filter(p => p && typeof p === 'object');
         
-        grid.innerHTML = this.filteredProjects.map(project => `
-            <div class="project-card bg-white rounded-xl shadow-md hover:shadow-lg transition-all duration-300 overflow-hidden cursor-pointer" 
-                 data-project-id="${project.id}" onclick="projectManager.selectProject('${project.id}')">
-                <div class="p-6">
-                    <div class="flex items-center justify-between mb-3">
-                        <div class="text-xs px-2 py-1 rounded-full ${this.getPhaseColor(project.current_phase)}">
-                            ${this.getPhaseLabel(project.current_phase)}
-                        </div>
-                        <div class="text-xs text-gray-500">
-                            ${this.formatDate(project.updated_at || project.created_at)}
-                        </div>
-                    </div>
-                    
-                    <h3 class="text-lg font-semibold text-gray-800 mb-2 line-clamp-2">${project.title}</h3>
-                    
-                    <p class="text-sm text-gray-600 mb-4 line-clamp-3">${project.description || 'Bez popisu'}</p>
-                    
-                    <div class="flex items-center justify-between text-xs text-gray-500 mb-4">
-                        <span>${project.genre || 'Bez žánru'}</span>
-                        <span>${project.scene_count || 0} scén</span>
-                    </div>
-                    
-                    <!-- Progress bar -->
-                    <div class="mb-4">
-                        <div class="flex items-center justify-between text-xs text-gray-500 mb-1">
-                            <span>Progres</span>
-                            <span>${this.calculateProgress(project)}%</span>
-                        </div>
-                        <div class="bg-gray-200 rounded-full h-2">
-                            <div class="bg-blue-500 h-2 rounded-full transition-all" 
-                                 style="width: ${this.calculateProgress(project)}%"></div>
-                        </div>
-                    </div>
-                    
-                    <div class="flex items-center justify-between">
-                        <div class="flex items-center space-x-1">
-                            ${project.current_word_count ? `
-                                <span class="text-xs text-gray-500">${project.current_word_count.toLocaleString()} slov</span>
-                            ` : ''}
-                        </div>
-                        <div class="flex space-x-1">
-                            <button onclick="event.stopPropagation(); projectManager.editProject('${project.id}')" 
-                                    class="text-blue-500 hover:text-blue-700 text-xs p-1">✏️</button>
-                            <button onclick="event.stopPropagation(); projectManager.deleteProject('${project.id}')" 
-                                    class="text-red-500 hover:text-red-700 text-xs p-1">🗑️</button>
-                        </div>
-                    </div>
+        if (validProjects.length === 0) {
+            projectsGrid.innerHTML = `
+                <div class="col-span-2 text-center py-8 text-gray-500">
+                    <p>Received invalid project data from server. Please try again or create a new project.</p>
+                </div>
+            `;
+            return;
+        }
+        
+        projectsGrid.innerHTML = validProjects.map(project => `
+            <div class="bg-white rounded-lg shadow-md p-4 border border-gray-200 hover:border-blue-400 cursor-pointer transition-all"
+                 onclick="selectProject('${project.id}')">
+                <h3 class="font-bold text-gray-800 mb-1">${project.title || 'Untitled Project'}</h3>
+                <p class="text-sm text-gray-600 mb-2 line-clamp-2">${project.description || 'No description'}</p>
+                <div class="flex justify-between items-center text-xs text-gray-500">
+                    <span>Scenes: ${project.scene_count || 0}</span>
+                    <span>Genre: ${project.genre || 'Unknown'}</span>
+                </div>
+                <div class="mt-2 flex justify-between items-center">
+                    <span class="text-xs text-gray-500">
+                        Updated: ${this.formatDate(project.updated_at)}
+                    </span>
+                    <span class="bg-blue-100 text-blue-800 text-xs px-2 py-1 rounded-full">
+                        ${project.current_phase || 'idea'}
+                    </span>
                 </div>
             </div>
         `).join('');
     }
-    
-    async selectProject(projectId) {
-        try {
-            ui.showLoading('Načítám projekt...');
-            
-            const response = await state.api.getProject(projectId);
-            state.currentProject = response.project;
-            
-            // Update UI
-            document.getElementById('current-project-title').textContent = response.project.title;
-            
-            // Set appropriate phase
-            setPhase(response.project.current_phase || 'idea');
-            
-            // Load project data based on phase
-            if (response.project.current_phase === 'expand') {
-                await expandManager.loadProjectData(projectId);
-            }
-            
-            this.closeProjectList();
-            ui.showToast('Projekt načten', 'success');
-            
-        } catch (error) {
-            ui.showToast('Chyba při načítání projektu: ' + error.message, 'error');
-        } finally {
-            ui.hideLoading();
-        }
+        
+    // Format date for display
+    formatDate(dateString) {
+        if (!dateString) return 'N/A';
+        const date = new Date(dateString);
+        return date.toLocaleDateString();
     }
     
+    // Select a project
+    async selectProject(id) {
+        try {
+            ui.showLoading('Loading project...');
+            
+            const response = await state.api.getProject(id);
+            
+            // Set the current project in the global state
+            state.currentProject = response.project;
+            
+            // If we're in the expand phase, update the expand manager
+            if (state.currentPhase === 'expand' && expandManager) {
+                expandManager.currentProject = response.project;
+                expandManager.scenes = response.scenes || [];
+                expandManager.objects = response.objects || [];
+                expandManager.renderScenes();
+                expandManager.updateStats();
+            }
+            
+            // Update the UI to reflect the selected project
+            document.getElementById('current-project-title').textContent = response.project.title;
+            
+            // Update the project status bar
+            updateProjectStatusBar();
+            
+            // Close the project selection modal
+            this.closeProjectList();
+            
+            ui.hideLoading();
+            ui.showToast(`Project "${response.project.title}" loaded`, 'success');
+            
+        } catch (error) {
+            ui.hideLoading();
+            ui.showToast('Failed to load project: ' + error.message, 'error');
+        }
+    }
+
     async deleteProject(projectId) {
         const project = this.projects.find(p => p.id === projectId);
         if (!project) return;
@@ -222,54 +247,29 @@ class ProjectManager {
             ui.hideLoading();
         }
     }
+    // Show the project list modal
+    showProjectList() {
+        document.getElementById('project-list-modal').classList.remove('hidden');
+        this.loadProjects();
+    }
     
+    // Close the project list modal
     closeProjectList() {
         document.getElementById('project-list-modal').classList.add('hidden');
     }
-    
-    getPhaseColor(phase) {
-        const colors = {
-            'idea': 'bg-yellow-100 text-yellow-800',
-            'expand': 'bg-blue-100 text-blue-800',
-            'story': 'bg-green-100 text-green-800'
-        };
-        return colors[phase] || 'bg-gray-100 text-gray-800';
-    }
-    
-    getPhaseLabel(phase) {
-        const labels = {
-            'idea': 'Nápad',
-            'expand': 'Expanze',
-            'story': 'Příběh'
-        };
-        return labels[phase] || 'Neznámé';
-    }
-    
-    calculateProgress(project) {
-        let progress = 0;
-        
-        if (project.current_phase === 'expand') progress = 50;
-        if (project.current_phase === 'story') progress = 100;
-        
-        // Add scene-based progress
-        if (project.scene_count) {
-            progress += Math.min(project.scene_count * 5, 30);
-        }
-        
-        return Math.min(progress, 100);
-    }
-    
-    formatDate(dateString) {
-        if (!dateString) return '';
-        
-        const date = new Date(dateString);
-        const now = new Date();
-        const diffTime = Math.abs(now - date);
-        const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
-        
-        if (diffDays === 1) return 'Včera';
-        if (diffDays <= 7) return `Před ${diffDays} dny`;
-        
-        return date.toLocaleDateString('cs-CZ');
-    }
+}
+
+// Global function to select a project
+async function selectProject(id) {
+    await projectManager.selectProject(id);
+}
+
+// Global function to show the project list
+function showProjectList() {
+    projectManager.showProjectList();
+}
+
+// Global function to close the project list
+function closeProjectList() {
+    projectManager.closeProjectList();
 }

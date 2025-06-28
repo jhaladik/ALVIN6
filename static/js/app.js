@@ -68,6 +68,87 @@ async function logout() {
     }
 }
 
+// Add to your setPhase function in ui.js or app.js
+function setPhase(phase) {
+    state.currentPhase = phase;
+    ui.setPhase(phase);
+    
+    // Show/hide the no project selected message
+    const noProjectMsg = document.getElementById('no-project-selected-message');
+    if (noProjectMsg) {
+        if (phase === 'expand' && (!state.currentProject || !state.currentProject.id)) {
+            noProjectMsg.classList.remove('hidden');
+        } else {
+            noProjectMsg.classList.add('hidden');
+        }
+    }
+    
+    // Phase-specific initialization
+    switch (phase) {
+        case 'expand':
+            if (state.currentProject) {
+                expandManager.loadProjectData(state.currentProject.id);
+            }
+            break;
+        case 'story':
+            // Initialize story phase if needed
+            break;
+    }
+    
+    // Update the project status bar
+    updateProjectStatusBar();
+}
+
+// Add this function to your ui.js file
+function updateProjectStatusBar() {
+    const projectNameEl = document.getElementById('current-project-name');
+    const projectIdEl = document.getElementById('current-project-id');
+    const phaseIndicatorEl = document.getElementById('current-phase-indicator');
+    
+    if (state.currentProject && state.currentProject.id) {
+        projectNameEl.textContent = state.currentProject.title || 'Untitled Project';
+        projectIdEl.textContent = `(ID: ${state.currentProject.id})`;
+        
+        // Change the color to indicate an active project
+        projectNameEl.classList.remove('text-gray-500');
+        projectNameEl.classList.add('text-blue-600');
+    } else {
+        projectNameEl.textContent = 'No project selected';
+        projectIdEl.textContent = '';
+        
+        // Change the color to indicate no project is active
+        projectNameEl.classList.remove('text-blue-600');
+        projectNameEl.classList.add('text-gray-500');
+    }
+    
+    // Update phase indicator
+    if (phaseIndicatorEl) {
+        phaseIndicatorEl.textContent = state.currentPhase || 'idea';
+        
+        // Update the styling based on the phase
+        phaseIndicatorEl.className = 'px-2 py-1 rounded-full text-xs';
+        
+        switch (state.currentPhase) {
+            case 'idea':
+                phaseIndicatorEl.classList.add('bg-purple-100', 'text-purple-800');
+                break;
+            case 'expand':
+                phaseIndicatorEl.classList.add('bg-blue-100', 'text-blue-800');
+                break;
+            case 'story':
+                phaseIndicatorEl.classList.add('bg-green-100', 'text-green-800');
+                break;
+            default:
+                phaseIndicatorEl.classList.add('bg-gray-100', 'text-gray-800');
+        }
+    }
+}
+
+async function selectProject(id) {
+    await projectManager.selectProject(id);
+    updateProjectStatusBar(); // Update the status bar after project selection
+}
+
 async function analyzeIdea() {
     const ideaText = ideaTextArea.value.trim();
     if (ideaText.length < 10) {
@@ -152,12 +233,12 @@ async function retryConnection() {
 async function loadProjects() { console.log("Načítání projektů..."); }
 async function selectProject(id) { console.log(`Výběr projektu ${id}`); }
 function createNewProject() { ui.showToast('Pro vytvoření projektu použijte fázi "Nápad"', 'info'); setPhase('idea'); }
-function showProjectList() { ui.showToast('Seznam projektů bude implementován', 'info'); }
 
 // Phase management (delegated to UI, but called from app logic)
 function setPhase(phase) {
     state.currentPhase = phase;
     ui.setPhase(phase);
+    updateProjectStatusBar(); // Update the status bar when phase changes
 }
 
 // --- EVENT LISTENERS & INITIALIZATION ---
@@ -188,12 +269,17 @@ function setupEventListeners() {
         }
     });
 }
-
+// In your app.js or where you initialize everything
 document.addEventListener('DOMContentLoaded', async () => {
     console.log('🎭 StoryForge AI - Initializing...');
     ui.updateConnectionStatus(false);
     ui.connectionIndicator.textContent = '🔄 Připojuji...';
     
+    // Initialize managers
+    window.projectManager = new ProjectManager();
+    window.expandManager = new ExpandPhaseManager();
+    
+    // Setup event listeners
     setupEventListeners();
     
     const isOnline = await state.api.healthCheck();
@@ -203,6 +289,9 @@ document.addEventListener('DOMContentLoaded', async () => {
         ui.updateConnectionStatus(false);
         document.getElementById('current-project-title').textContent = 'Problém s připojením k serveru';
     }
+    
+    // Initialize the status bar
+    updateProjectStatusBar();
     
     setPhase('idea');
     console.log('✅ StoryForge AI - Initialized');
