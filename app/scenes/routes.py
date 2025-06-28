@@ -1,5 +1,5 @@
 # app/scenes/routes.py - UPDATED scene creation with Claude
-from flask import request, jsonify, session
+from flask import request, jsonify, session, current_app
 from app.scenes import scenes_bp
 from app.models import Scene, Project, StoryObject, SceneObject
 from app.utils.auth import login_required, check_tokens, use_tokens
