@@ -1,11 +1,16 @@
-# tests/conftest.py - Pytest Configuration and Fixtures
-import pytest
-import tempfile
+# tests/conftest.py - Fixed with proper Python path handling
+import sys
 import os
+import pytest
 from datetime import datetime, timedelta
+
+# Add the parent directory (project root) to the Python path
+# This ensures the 'app' module can be imported
+sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
+
+# Now we can import from the app package
 from app import create_app, db
 from app.models import User, Project, Scene, StoryObject, BillingPlan, UserSubscription
-from app.services.token_manager import token_manager
 
 @pytest.fixture(scope='session')
 def app():

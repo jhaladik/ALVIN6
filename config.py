@@ -1,4 +1,4 @@
-# config.py - UPDATED with Claude API config
+# config.py - UPDATED with TestingConfig
 import os
 from datetime import timedelta
 
@@ -30,8 +30,18 @@ class DevelopmentConfig(Config):
 class ProductionConfig(Config):
     DEBUG = False
 
+class TestingConfig(Config):
+    TESTING = True
+    DEBUG = True
+    SQLALCHEMY_DATABASE_URI = 'sqlite:///:memory:'
+    WTF_CSRF_ENABLED = False
+    AI_SIMULATION_MODE = True
+    PAYMENT_SIMULATION_MODE = True
+    SERVER_NAME = 'localhost.localdomain'  # Required for URL generation in testing
+
 config = {
     'development': DevelopmentConfig,
     'production': ProductionConfig,
+    'testing': TestingConfig,  # Add testing configuration
     'default': DevelopmentConfig
 }

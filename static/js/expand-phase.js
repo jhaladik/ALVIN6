@@ -15,23 +15,25 @@ class ExpandPhaseManager {
     
     setupEventListeners() {
         // Scene description input handlers
-        const descInput = document.getElementById('scene-description-input');
-        if (descInput) {
-            descInput.addEventListener('input', this.updateWordCount.bind(this));
-            descInput.addEventListener('input', this.debounce(this.autoSaveScene.bind(this), 2000));
-        }
+        document.addEventListener('input', (e) => {
+            if (e.target && e.target.id === 'scene-description-input') {
+                this.updateWordCount();
+                this.debouncedAutoSave();
+            }
+        });
         
         // Intensity slider
-        const intensitySlider = document.getElementById('intensity-slider');
-        if (intensitySlider) {
-            intensitySlider.addEventListener('input', (e) => {
-                document.getElementById('intensity-value').textContent = e.target.value;
-                this.updateIntensityIndicator(parseFloat(e.target.value));
-            });
-        }
+        document.addEventListener('input', (e) => {
+            if (e.target && e.target.id === 'intensity-slider') {
+                const value = e.target.value;
+                const valueEl = document.getElementById('intensity-value');
+                if (valueEl) valueEl.textContent = value;
+                this.updateIntensityIndicator(parseFloat(value));
+            }
+        });
         
-        // Auto-resize textareas
-        this.setupAutoResizeTextareas();
+        // Set up debounced autosave
+        this.debouncedAutoSave = this.debounce(this.autoSaveScene.bind(this), 2000);
     }
     
     async loadProjectData(projectId) {
@@ -65,6 +67,11 @@ class ExpandPhaseManager {
     renderTimelineView() {
         const timeline = document.getElementById('scene-timeline');
         const noScenesMsg = document.getElementById('no-scenes-message');
+        
+        if (!timeline || !noScenesMsg) {
+            console.warn('Timeline elements not found in DOM');
+            return;
+        }
         
         if (this.scenes.length === 0) {
             timeline.innerHTML = '';
@@ -187,25 +194,85 @@ class ExpandPhaseManager {
     
     showSceneDetails() {
         const panel = document.getElementById('scene-details-panel');
+        if (!panel) {
+            console.warn('Scene details panel not found in DOM');
+            return;
+        }
+        
         panel.classList.remove('hidden');
         
         // Populate form with scene data
-        document.getElementById('scene-title-input').value = this.currentScene.title || '';
-        document.getElementById('scene-type-select').value = this.currentScene.scene_type || 'development';
-        document.getElementById('scene-location-input').value = this.currentScene.location || '';
-        document.getElementById('scene-description-input').value = this.currentScene.description || '';
-        document.getElementById('scene-conflict-input').value = this.currentScene.conflict || '';
-        document.getElementById('scene-hook-input').value = this.currentScene.hook || '';
+        this.setSafeValue('scene-title-input', this.currentScene.title || '');
+        this.setSafeValue('scene-type-select', this.currentScene.scene_type || 'development');
+        this.setSafeValue('scene-location-input', this.currentScene.location || '');
+        this.setSafeValue('scene-description-input', this.currentScene.description || '');
+        this.setSafeValue('scene-conflict-input', this.currentScene.conflict || '');
+        this.setSafeValue('scene-hook-input', this.currentScene.hook || '');
         
         const intensity = this.currentScene.emotional_intensity || 0.5;
-        document.getElementById('intensity-slider').value = intensity;
-        document.getElementById('intensity-value').textContent = intensity;
+        this.setSafeValue('intensity-slider', intensity);
+        const valueEl = document.getElementById('intensity-value');
+        if (valueEl) valueEl.textContent = intensity;
         
         this.updateWordCount();
         this.renderSceneObjects();
+        this.updateIntensityIndicator(intensity);
         
         // Scroll to panel
         panel.scrollIntoView({ behavior: 'smooth' });
+    }
+    
+    // Helper method to safely set form values
+    setSafeValue(elementId, value) {
+        const element = document.getElementById(elementId);
+        if (element) {
+            element.value = value;
+        } else {
+            console.warn(`Element #${elementId} not found in DOM`);
+        }
+    }
+    
+    // Safely update intensity indicator
+    updateIntensityIndicator(value) {
+        const indicator = document.getElementById('intensity-indicator');
+        if (indicator) {
+            indicator.style.width = `${value * 100}%`;
+            
+            // Update color based on intensity
+            indicator.className = 'h-2.5 rounded-full';
+            if (value >= 0.7) {
+                indicator.classList.add('bg-red-600');
+            } else if (value >= 0.4) {
+                indicator.classList.add('bg-orange-500');
+            } else {
+                indicator.classList.add('bg-blue-500');
+            }
+        }
+    }
+    
+    renderSceneObjects() {
+        const container = document.getElementById('scene-objects');
+        if (!container) {
+            console.warn('Scene objects container not found');
+            return;
+        }
+        
+        if (!this.currentScene || !this.currentScene.objects || this.currentScene.objects.length === 0) {
+            container.innerHTML = '<p class="text-gray-500 text-sm">Žádné objekty ve scéně</p>';
+            return;
+        }
+        
+        container.innerHTML = `
+            <div class="flex flex-wrap gap-2">
+                ${this.currentScene.objects.map(obj => `
+                    <div class="flex items-center bg-gray-100 px-3 py-1 rounded-full">
+                        <span class="text-sm">${obj.name}</span>
+                        <button class="ml-2 text-gray-500 hover:text-red-500 text-xs" 
+                                onclick="expandManager.removeObjectFromScene(${obj.id})">×</button>
+                    </div>
+                `).join('')}
+            </div>
+        `;
     }
     
     async addNewScene() {
@@ -220,7 +287,7 @@ class ExpandPhaseManager {
                 title: 'Nová scéna',
                 description: '',
                 scene_type: 'development',
-                project_id: this.currentProject.id,
+                project_id: this.currentProject?.id,
                 location: '',
                 emotional_intensity: 0.5
             };
@@ -257,14 +324,28 @@ class ExpandPhaseManager {
         if (!this.currentScene) return;
         
         try {
+            const titleInput = document.getElementById('scene-title-input');
+            const descInput = document.getElementById('scene-description-input');
+            const typeSelect = document.getElementById('scene-type-select');
+            const locationInput = document.getElementById('scene-location-input');
+            const conflictInput = document.getElementById('scene-conflict-input');
+            const hookInput = document.getElementById('scene-hook-input');
+            const intensitySlider = document.getElementById('intensity-slider');
+            
+            // Make sure all required elements exist
+            if (!titleInput || !descInput || !typeSelect) {
+                ui.showToast('Některé vstupní prvky nebyly nalezeny', 'error');
+                return;
+            }
+            
             const updatedData = {
-                title: document.getElementById('scene-title-input').value,
-                description: document.getElementById('scene-description-input').value,
-                scene_type: document.getElementById('scene-type-select').value,
-                location: document.getElementById('scene-location-input').value,
-                conflict: document.getElementById('scene-conflict-input').value,
-                hook: document.getElementById('scene-hook-input').value,
-                emotional_intensity: parseFloat(document.getElementById('intensity-slider').value)
+                title: titleInput.value,
+                description: descInput.value,
+                scene_type: typeSelect.value,
+                location: locationInput?.value || '',
+                conflict: conflictInput?.value || '',
+                hook: hookInput?.value || '',
+                emotional_intensity: parseFloat(intensitySlider?.value || 0.5)
             };
             
             ui.showLoading('Ukládám změny...');
@@ -325,7 +406,7 @@ class ExpandPhaseManager {
     }
     
     async analyzeStructure() {
-        if (this.scenes.length < 2) {
+        if (!this.scenes || this.scenes.length < 2) {
             ui.showToast('Pro analýzu struktury potřebujete alespoň 2 scény', 'warning');
             return;
         }
@@ -345,7 +426,9 @@ class ExpandPhaseManager {
                 return;
             }
             
-            document.getElementById('structure-analysis-panel').classList.remove('hidden');
+            // Show panel before API call to indicate activity
+            this.toggleElementVisibility('structure-analysis-panel', true);
+            ui.showLoading('AI analyzuje strukturu příběhu...');
             
             const response = await state.api.analyzeStructure(this.currentProject.id);
             
@@ -357,15 +440,20 @@ class ExpandPhaseManager {
         } catch (error) {
             ui.showToast('Chyba při analýze: ' + error.message, 'error');
             this.closeStructureAnalysis();
+        } finally {
+            ui.hideLoading();
         }
     }
     
     async suggestScenes() {
         try {
-            const focusType = document.getElementById('suggestion-focus-select')?.value || 'any';
+            const focusTypeElement = document.getElementById('suggestion-focus-select');
+            const focusType = focusTypeElement?.value || 'any';
             
             ui.showLoading('AI generuje návrhy scén...');
-            document.getElementById('ai-suggestions-panel').classList.remove('hidden');
+            
+            // Safely show the panel
+            this.toggleElementVisibility('ai-suggestions-panel', true);
             
             const response = await state.api.suggestScenes(this.currentProject.id);
             
@@ -384,6 +472,10 @@ class ExpandPhaseManager {
     
     renderStructureAnalysis(analysis) {
         const content = document.getElementById('structure-analysis-content');
+        if (!content) {
+            console.warn('Structure analysis content container not found');
+            return;
+        }
         
         content.innerHTML = `
             <div class="space-y-6">
@@ -397,7 +489,7 @@ class ExpandPhaseManager {
                 
                 <!-- Score Breakdown -->
                 <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
-                    ${Object.entries(analysis.score_breakdown).map(([type, data]) => `
+                    ${Object.entries(analysis.score_breakdown || {}).map(([type, data]) => `
                         <div class="text-center p-4 bg-gray-50 rounded-lg">
                             <div class="text-2xl font-bold ${this.getScoreColor(data.score)}">${data.score}</div>
                             <div class="text-sm text-gray-600">${data.critic}</div>
@@ -409,7 +501,7 @@ class ExpandPhaseManager {
                 <div>
                     <h4 class="text-lg font-semibold mb-3">🎯 Prioritní doporučení</h4>
                     <div class="space-y-2">
-                        ${analysis.priority_recommendations.slice(0, 5).map(rec => `
+                        ${(analysis.priority_recommendations || []).slice(0, 5).map(rec => `
                             <div class="flex items-start space-x-3 p-3 ${this.getUrgencyBg(rec.urgency)} rounded-lg">
                                 <span class="text-lg">${this.getUrgencyIcon(rec.urgency)}</span>
                                 <div>
@@ -422,7 +514,7 @@ class ExpandPhaseManager {
                 </div>
                 
                 <!-- Key Strengths -->
-                ${analysis.overall_summary.key_strengths.length > 0 ? `
+                ${(analysis.overall_summary.key_strengths || []).length > 0 ? `
                     <div>
                         <h4 class="text-lg font-semibold mb-3">💪 Silné stránky</h4>
                         <div class="space-y-1">
@@ -437,7 +529,7 @@ class ExpandPhaseManager {
                 ` : ''}
                 
                 <!-- Major Issues -->
-                ${analysis.overall_summary.major_issues.length > 0 ? `
+                ${(analysis.overall_summary.major_issues || []).length > 0 ? `
                     <div>
                         <h4 class="text-lg font-semibold mb-3">⚠️ Hlavní problémy</h4>
                         <div class="space-y-1">
@@ -456,6 +548,15 @@ class ExpandPhaseManager {
     
     renderAISuggestions(suggestions) {
         const list = document.getElementById('ai-suggestions-list');
+        if (!list) {
+            console.warn('AI suggestions list container not found');
+            return;
+        }
+        
+        if (!suggestions || suggestions.length === 0) {
+            list.innerHTML = '<div class="text-center text-gray-500">Žádné návrhy nebyly vygenerovány</div>';
+            return;
+        }
         
         list.innerHTML = suggestions.map((suggestion, index) => `
             <div class="bg-gradient-to-r from-blue-50 to-purple-50 rounded-lg p-4 border-l-4 border-blue-400">
@@ -496,6 +597,16 @@ class ExpandPhaseManager {
                 </div>
             </div>
         `).join('');
+    }
+    
+    acceptSuggestion(index) {
+        // Implement suggestion acceptance logic
+        ui.showToast('Funkce bude implementována', 'info');
+    }
+    
+    modifySuggestion(index) {
+        // Implement suggestion modification logic
+        ui.showToast('Funkce bude implementována', 'info');
     }
     
     // Utility methods
@@ -545,12 +656,37 @@ class ExpandPhaseManager {
         return 'low-intensity';
     }
     
+    getScoreColor(score) {
+        const scoreNum = parseFloat(score) || 0;
+        if (scoreNum >= 4.0) return 'text-green-600';
+        if (scoreNum >= 3.0) return 'text-blue-600';
+        if (scoreNum >= 2.0) return 'text-orange-500';
+        return 'text-red-600';
+    }
+    
+    getUrgencyBg(urgency) {
+        if (urgency === 'high') return 'bg-red-50';
+        if (urgency === 'medium') return 'bg-orange-50';
+        return 'bg-blue-50';
+    }
+    
+    getUrgencyIcon(urgency) {
+        if (urgency === 'high') return '🔴';
+        if (urgency === 'medium') return '🟠';
+        return '🔵';
+    }
+    
     updateStats() {
-        document.getElementById('total-scenes').textContent = this.scenes.length;
-        document.getElementById('total-objects').textContent = this.objects.length;
+        const totalScenesEl = document.getElementById('total-scenes');
+        const totalObjectsEl = document.getElementById('total-objects');
+        const wordCountEl = document.getElementById('word-count');
+        const completionPercentageEl = document.getElementById('completion-percentage');
+        
+        if (totalScenesEl) totalScenesEl.textContent = this.scenes.length;
+        if (totalObjectsEl) totalObjectsEl.textContent = this.objects.length;
         
         const totalWords = this.scenes.reduce((sum, scene) => sum + (scene.word_count || 0), 0);
-        document.getElementById('word-count').textContent = totalWords.toLocaleString();
+        if (wordCountEl) wordCountEl.textContent = totalWords.toLocaleString();
         
         // Calculate completion percentage based on scene types
         const hasOpening = this.scenes.some(s => s.scene_type === 'opening');
@@ -564,16 +700,19 @@ class ExpandPhaseManager {
         if (hasClimax) completion += 20;
         if (hasResolution) completion += 20;
         
-        document.getElementById('completion-percentage').textContent = `${completion}%`;
+        if (completionPercentageEl) completionPercentageEl.textContent = `${completion}%`;
     }
     
     updateWordCount() {
-        const description = document.getElementById('scene-description-input').value;
+        const description = document.getElementById('scene-description-input')?.value || '';
         const charCount = description.length;
         const wordCount = description.trim() ? description.trim().split(/\s+/).length : 0;
         
-        document.getElementById('description-char-count').textContent = charCount;
-        document.getElementById('description-word-count').textContent = wordCount;
+        const charCountEl = document.getElementById('description-char-count');
+        const wordCountEl = document.getElementById('description-word-count');
+        
+        if (charCountEl) charCountEl.textContent = charCount;
+        if (wordCountEl) wordCountEl.textContent = wordCount;
     }
     
     debounce(func, wait) {
@@ -593,9 +732,14 @@ class ExpandPhaseManager {
         if (this.currentScene && this.canEditScenes()) {
             // Silently save without showing loading/success messages
             try {
+                const descriptionEl = document.getElementById('scene-description-input');
+                const titleEl = document.getElementById('scene-title-input');
+                
+                if (!descriptionEl || !titleEl) return;
+                
                 const updatedData = {
-                    description: document.getElementById('scene-description-input').value,
-                    title: document.getElementById('scene-title-input').value
+                    description: descriptionEl.value,
+                    title: titleEl.value
                 };
                 
                 await state.api.updateScene(this.currentScene.id, updatedData);
@@ -655,18 +799,140 @@ class ExpandPhaseManager {
         });
     }
     
+    handleUserJoined(data) {
+        // Implement user joined handling
+        ui.showToast(`${data.username || 'Uživatel'} se připojil k projektu`, 'info');
+    }
+    
+    handleSceneUpdated(data) {
+        // Update scene if someone else edited it
+        if (data.user_id !== state.currentUser?.id) {
+            const sceneIndex = this.scenes.findIndex(s => s.id === data.scene_id);
+            if (sceneIndex >= 0) {
+                this.scenes[sceneIndex] = {...this.scenes[sceneIndex], ...data.changes};
+                this.renderScenes();
+                
+                // Update current scene if it's the one being edited
+                if (this.currentScene && this.currentScene.id === data.scene_id) {
+                    this.currentScene = {...this.currentScene, ...data.changes};
+                    this.showSceneDetails();
+                }
+                
+                ui.showToast(`Scéna "${data.changes.title || 'Bez názvu'}" byla aktualizována`, 'info');
+            }
+        }
+    }
+    
+    handleUserTyping(data) {
+        // Show typing indicator for scene
+        if (data.user_id !== state.currentUser?.id) {
+            const scenePresence = document.getElementById(`scene-${data.scene_id}-presence`);
+            if (scenePresence && data.is_typing) {
+                const typingIndicator = document.createElement('div');
+                typingIndicator.className = 'typing-indicator text-xs text-blue-500';
+                typingIndicator.textContent = '✍️';
+                typingIndicator.setAttribute('data-user', data.user_id);
+                
+                // Remove existing indicator for this user
+                const existing = scenePresence.querySelector(`[data-user="${data.user_id}"]`);
+                if (existing) {
+                    existing.remove();
+                }
+                
+                scenePresence.appendChild(typingIndicator);
+                
+                // Auto-remove after 5 seconds
+                setTimeout(() => {
+                    if (typingIndicator.parentNode) {
+                        typingIndicator.remove();
+                    }
+                }, 5000);
+            }
+        }
+    }
+    
+    loadCollaborators() {
+        // Implement collaborator loading
+        console.log("Collaborator loading would happen here");
+    }
+    
+    notifySceneSelection(sceneId) {
+        // Notify others about scene selection
+        if (this.socket) {
+            this.socket.emit('scene_editing', {
+                project_id: this.currentProject.id,
+                scene_id: sceneId
+            });
+        }
+    }
+    
+    notifySceneCreated(scene) {
+        // Notify others about new scene
+        if (this.socket) {
+            this.socket.emit('scene_created', {
+                project_id: this.currentProject.id,
+                scene: scene
+            });
+        }
+    }
+    
+    notifySceneChanged(sceneId, changes) {
+        // Notify others about scene changes
+        if (this.socket) {
+            this.socket.emit('scene_changes', {
+                project_id: this.currentProject.id,
+                scene_id: sceneId,
+                changes: changes
+            });
+        }
+    }
+    
+    highlightSelectedScene(sceneId) {
+        // Remove highlight from all scenes
+        document.querySelectorAll('.scene-node, .kanban-scene').forEach(node => {
+            node.classList.remove('active');
+        });
+        
+        // Add highlight to selected scene
+        document.querySelectorAll(`[data-scene-id="${sceneId}"]`).forEach(node => {
+            node.classList.add('active');
+        });
+    }
+    
+    clearSceneHighlight() {
+        document.querySelectorAll('.scene-node, .kanban-scene').forEach(node => {
+            node.classList.remove('active');
+        });
+    }
+    
     closeScenePanel() {
-        document.getElementById('scene-details-panel').classList.add('hidden');
-        this.currentScene = null;
-        this.clearSceneHighlight();
+        const panel = document.getElementById('scene-details-panel');
+        if (panel) {
+            panel.classList.add('hidden');
+            this.currentScene = null;
+            this.clearSceneHighlight();
+        } else {
+            console.warn('Element #scene-details-panel not found in the DOM');
+            this.currentScene = null;
+        }
     }
     
     closeStructureAnalysis() {
-        document.getElementById('structure-analysis-panel').classList.add('hidden');
+        const panel = document.getElementById('structure-analysis-panel');
+        if (panel) {
+            panel.classList.add('hidden');
+        } else {
+            console.warn('Element #structure-analysis-panel not found in the DOM');
+        }
     }
     
     closeAISuggestions() {
-        document.getElementById('ai-suggestions-panel').classList.add('hidden');
+        const panel = document.getElementById('ai-suggestions-panel');
+        if (panel) {
+            panel.classList.add('hidden');
+        } else {
+            console.warn('Element #ai-suggestions-panel not found in the DOM');
+        }
     }
     
     toggleViewMode(mode) {
@@ -676,31 +942,55 @@ class ExpandPhaseManager {
     
     updateViewMode() {
         // Hide all views
-        ['timeline-view', 'kanban-view', 'graph-view'].forEach(id => {
-            document.getElementById(id).classList.add('hidden');
+        const viewIds = ['timeline-view', 'kanban-view', 'graph-view'];
+        const btnIds = ['timeline-view-btn', 'kanban-view-btn', 'graph-view-btn'];
+        
+        viewIds.forEach(id => {
+            const element = document.getElementById(id);
+            if (element) {
+                element.classList.add('hidden');
+            }
         });
         
         // Show selected view
-        document.getElementById(`${this.viewMode}-view`).classList.remove('hidden');
+        const selectedView = document.getElementById(`${this.viewMode}-view`);
+        if (selectedView) {
+            selectedView.classList.remove('hidden');
+        }
         
         // Update button states
-        ['timeline', 'kanban', 'graph'].forEach(mode => {
-            const btn = document.getElementById(`${mode}-view-btn`);
+        btnIds.forEach(id => {
+            const btn = document.getElementById(id);
             if (btn) {
-                btn.classList.toggle('bg-blue-500', mode === this.viewMode);
-                btn.classList.toggle('text-white', mode === this.viewMode);
+                btn.classList.remove('bg-blue-500', 'text-white');
             }
         });
+        
+        const activeBtn = document.getElementById(`${this.viewMode}-view-btn`);
+        if (activeBtn) {
+            activeBtn.classList.add('bg-blue-500', 'text-white');
+        }
     }
     
-    setupAutoResizeTextareas() {
-        const textareas = document.querySelectorAll('textarea');
-        textareas.forEach(textarea => {
-            textarea.addEventListener('input', function() {
-                this.style.height = 'auto';
-                this.style.height = this.scrollHeight + 'px';
-            });
-        });
+    // Helper method to safely toggle element visibility
+    toggleElementVisibility(elementId, show = true) {
+        const element = document.getElementById(elementId);
+        if (element) {
+            if (show) {
+                element.classList.remove('hidden');
+            } else {
+                element.classList.add('hidden');
+            }
+            return true;
+        } else {
+            console.warn(`Element #${elementId} not found in the DOM`);
+            return false;
+        }
+    }
+    
+    removeObjectFromScene(objectId) {
+        // Implement object removal from scene
+        ui.showToast('Funkce bude implementována', 'info');
     }
 }
 

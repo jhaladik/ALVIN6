@@ -1,4 +1,4 @@
-# app/services/claude_api.py - FIXED Claude API Client with proper imports
+# app/services/claude_api.py - FIXED with proxy settings
 import os
 import json
 import re
@@ -44,9 +44,34 @@ class ClaudeAPIClient:
         
         if not self.simulation_mode and ANTHROPIC_AVAILABLE:
             try:
-                # Initialize Anthropic client with minimal arguments for compatibility
-                self.client = Anthropic(api_key=self.api_key)
-                print(f"Claude API: Initialized successfully with model {self.model}")
+                # IMPORTANT: Disable environment proxy settings for Anthropic client
+                # This prevents proxy-related errors if HTTP_PROXY env vars are set
+                # but the proxy isn't accessible
+                
+                # Create custom http_client with proxies explicitly disabled
+                import requests
+                from anthropic.transport import CustomHTTPClient
+                
+                # Clear any proxy environment variables for this process
+                os.environ.pop('HTTP_PROXY', None)
+                os.environ.pop('HTTPS_PROXY', None)
+                os.environ.pop('http_proxy', None)
+                os.environ.pop('https_proxy', None)
+                
+                # Create a session with explicitly disabled proxies
+                session = requests.Session()
+                session.proxies = {'http': None, 'https': None}
+                
+                # Use this session for Anthropic requests
+                http_client = CustomHTTPClient(session=session)
+                
+                # Initialize Anthropic client with custom HTTP client
+                self.client = Anthropic(
+                    api_key=self.api_key,
+                    http_client=http_client
+                )
+                
+                print(f"Claude API: Initialized successfully with model {self.model} (proxies disabled)")
             except Exception as e:
                 print(f"Claude API: Initialization failed: {str(e)}")
                 print("Claude API: Falling back to simulation mode")
@@ -146,8 +171,12 @@ class ClaudeAPIClient:
             error_msg = str(e)
             self._safe_log(f"Claude API error: {error_msg}", 'error')
             
+            # Check for proxy-related errors
+            if any(term in error_msg.lower() for term in ['proxy', 'connect', 'timeout', 'connection']):
+                self._safe_log(f"Claude API: Possible network/proxy error: {error_msg}", 'warning')
+                
             # Fallback to simulation for certain errors
-            if any(keyword in error_msg.lower() for keyword in ['rate limit', 'quota', 'billing', 'api key']):
+            if any(keyword in error_msg.lower() for keyword in ['rate limit', 'quota', 'billing', 'api key', 'proxy']):
                 self._safe_log("Claude API: Critical error, switching to simulation mode", 'warning')
                 self.simulation_mode = True
                 return self._simulate_response(prompt)
@@ -162,67 +191,21 @@ class ClaudeAPIClient:
         
         prompt_lower = prompt.lower()
         
+        # FIXED: Return clean JSON without newlines or extra spaces
         if "analyzuj scénu" in prompt_lower or "analyze scene" in prompt_lower:
-            return """
-            {
-                "characters": ["Sarah", "Pavel"],
-                "locations": ["Knihovna"],
-                "objects": ["Zakódovaný dopis", "Historické knihy"],
-                "conflicts": ["Odhalování pravdy"]
-            }
-            """
+            return '{"characters": ["Sarah", "Pavel"], "locations": ["Knihovna"], "objects": ["Zakódovaný dopis", "Historické knihy"], "conflicts": ["Odhalování pravdy"]}'
         elif "analyzuj strukturu" in prompt_lower or "analyze structure" in prompt_lower:
-            return """
-            {
-                "total_scenes": 2,
-                "continuity_score": 0.85,
-                "pacing_score": 0.72,
-                "scene_types": {"inciting": 1, "development": 1},
-                "missing_elements": ["climax", "resolution"],
-                "recommendations": [
-                    "Přidejte klimax scénu pro vrchol napětí",
-                    "Vytvořte rozuzlení pro uzavření příběhu"
-                ],
-                "strengths": ["Silná charakterizace hlavní postavy", "Dobré využití objektů"],
-                "scene_balance": "good",
-                "character_development": "strong"
-            }
-            """
+            return '{"total_scenes": 2, "continuity_score": 0.85, "pacing_score": 0.72, "scene_types": {"inciting": 1, "development": 1}, "missing_elements": ["climax", "resolution"], "recommendations": ["Přidejte klimax scénu pro vrchol napětí", "Vytvořte rozuzlení pro uzavření příběhu"], "strengths": ["Silná charakterizace hlavní postavy", "Dobré využití objektů"], "scene_balance": "good", "character_development": "strong"}'
         elif "navrhni scény" in prompt_lower or "suggest scenes" in prompt_lower:
-            return """
-            [
-                {
-                    "title": "Konfrontace s pravdou",
-                    "description": "Sarah konfrontuje svou matku s objevenými informacemi o babičce",
-                    "scene_type": "development",
-                    "suggested_objects": ["Rodinné fotografie", "Matka"],
-                    "confidence": 0.9
-                },
-                {
-                    "title": "Návštěva válečného archívu",
-                    "description": "Pavel a Sarah navštíví archív aby ověřili babiččinu identitu",
-                    "scene_type": "rising_action",
-                    "suggested_objects": ["Archivní dokumenty", "Historik"],
-                    "confidence": 0.85
-                }
-            ]
-            """
+            return '[{"title": "Konfrontace s pravdou", "description": "Sarah konfrontuje svou matku s objevenými informacemi o babičce", "scene_type": "development", "suggested_objects": ["Rodinné fotografie", "Matka"], "confidence": 0.9}, {"title": "Návštěva válečného archívu", "description": "Pavel a Sarah navštíví archív aby ověřili babiččinu identitu", "scene_type": "rising_action", "suggested_objects": ["Archivní dokumenty", "Historik"], "confidence": 0.85}]'
         elif "vytvořte příběh" in prompt_lower or "generate story" in prompt_lower:
-            return """
-            {
-                "title": "Tajemství babičky Anny",
-                "premise": "Mladá žena objevuje válečné tajemství své babičky skrze zakódované zprávy",
-                "theme": "Rodinné dědictví a síla pravdy",
-                "protagonist": "Sarah - transformace od nevědomosti k poznání rodinné historie",
-                "central_conflict": "Odhalování bolestivé pravdy vs. ochrana rodinného klidu",
-                "story_arc": "Objevení → Pátrání → Odhalení → Přijetí",
-                "tone": "Mystery s emotivními prvky",
-                "estimated_length": "15000 slov",
-                "target_audience": "Dospělí čtenáři mystery/drama"
-            }
-            """
+            return '{"title": "Tajemství babičky Anny", "premise": "Mladá žena objevuje válečné tajemství své babičky skrze zakódované zprávy", "theme": "Rodinné dědictví a síla pravdy", "protagonist": "Sarah - transformace od nevědomosti k poznání rodinné historie", "central_conflict": "Odhalování bolestivé pravdy vs. ochrana rodinného klidu", "story_arc": "Objevení → Pátrání → Odhalení → Přijetí", "tone": "Mystery s emotivními prvky", "estimated_length": "15000 slov", "target_audience": "Dospělí čtenáři mystery/drama"}'
+        # ADDED: Specific pattern match for idea analysis
+        elif "analyzujte tento nápad" in prompt_lower or "analyze idea" in prompt_lower:
+            return '{"story_assessment": {"genre": "mystery", "tone": "mysterious", "target_audience": "young adult", "estimated_scope": "novella", "themes": ["family secrets", "history", "identity"], "marketability": 4}, "extracted_objects": {"characters": ["Protagonist", "Babička", "Neznámý adresát"], "locations": ["Dům babičky", "Podkroví"], "objects": ["Zakódovaný dopis", "Stará skříňka", "Fotografie"], "conflicts": ["Odhalení rodinného tajemství", "Hledání pravdy"]}, "first_scene_suggestion": {"title": "Nález dopisu", "description": "Protagonista během úklidu po zesnulé babičce objeví v podkrovní skříňce zakódovaný dopis a starou fotografii.", "scene_type": "inciting", "location": "Podkroví babiččina domu", "objects": ["Zakódovaný dopis", "Stará skříňka", "Fotografie"], "hook": "Nikdy by nečekal, co najde v té staré skříňce...", "conflict": "Záhadný obsah dopisu budí zvědavost i obavy"}, "project_suggestions": {"title": "Šifra z minulosti", "description": "Mladá žena objeví tajemný zakódovaný dopis své babičky, který ji zavede na cestu odhalování rodinných tajemství z válečné doby.", "target_length": "30000"}, "next_steps": {"immediate_actions": ["Vytvořit hlavní postavu", "Rozvinout motiv dopisu"], "development_areas": ["Historický kontext", "Vztahy v rodině"], "potential_subplots": ["Romantická linka s pomocníkem", "Konfrontace s žijícími příbuznými"]}}'
         else:
-            return f"Simulovaná odpověď Claude API pro prompt: {prompt[:100]}..."
+            # Basic response for any other prompt
+            return 'Simulovaná odpověď Claude API pro prompt: ' + prompt[:50] + '...'
     
     def test_connection(self) -> Dict[str, any]:
         """Test Claude API connection and return status"""

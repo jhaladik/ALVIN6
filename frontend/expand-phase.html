@@ -1,0 +1,267 @@
+<!-- EXPAND PHASE CONTENT -->
+<div id="expand-phase-content" class="hidden space-y-6">
+    <div class="bg-white rounded-xl shadow-lg p-6">
+        <h2 class="text-2xl font-bold text-gray-800 mb-4">Expanze scén</h2>
+        <div class="flex items-center justify-between mb-6">
+            <div>
+                <p class="text-gray-600">Upravujte a organizujte scény vašeho příběhu.</p>
+                <div class="mt-2 text-sm bg-blue-50 p-2 rounded-lg">
+                    <span class="font-medium text-blue-700">Statistiky:</span>
+                    <span class="ml-2" id="total-scenes">0</span> scén,
+                    <span class="ml-2" id="total-objects">0</span> objektů,
+                    <span class="ml-2" id="word-count">0</span> slov,
+                    <span class="ml-2" id="completion-percentage">0%</span> dokončeno
+                </div>
+            </div>
+            <div class="flex space-x-3">
+                <button onclick="addNewScene()" class="bg-blue-500 text-white px-4 py-2 rounded-lg hover:bg-blue-600 flex items-center gap-2">
+                    <span>➕</span> Nová scéna
+                </button>
+                <button onclick="analyzeStructure()" class="bg-purple-500 text-white px-4 py-2 rounded-lg hover:bg-purple-600 flex items-center gap-2">
+                    <span>🧠</span> Analyzovat strukturu
+                </button>
+                <button onclick="suggestScenes()" class="bg-green-500 text-white px-4 py-2 rounded-lg hover:bg-green-600 flex items-center gap-2">
+                    <span>💡</span> AI návrhy
+                </button>
+            </div>
+        </div>
+
+        <!-- View Mode Selector -->
+        <div class="flex mb-6 bg-gray-100 p-1 rounded-lg inline-flex">
+            <button id="timeline-view-btn" onclick="toggleViewMode('timeline')" class="px-4 py-2 rounded-lg text-sm bg-blue-500 text-white">
+                📋 Timeline
+            </button>
+            <button id="kanban-view-btn" onclick="toggleViewMode('kanban')" class="px-4 py-2 rounded-lg text-sm">
+                📊 Kanban
+            </button>
+            <button id="graph-view-btn" onclick="toggleViewMode('graph')" class="px-4 py-2 rounded-lg text-sm">
+                🔄 Graf
+            </button>
+        </div>
+
+        <!-- Timeline View -->
+        <div id="timeline-view" class="relative">
+            <div id="no-scenes-message" class="text-center py-12 bg-gray-50 rounded-lg">
+                <div class="text-5xl mb-4">📝</div>
+                <h3 class="text-xl font-semibold text-gray-800 mb-2">Žádné scény</h3>
+                <p class="text-gray-600 mb-4">Začněte vytvořením první scény nebo použijte AI návrhy</p>
+                <button onclick="addNewScene()" class="bg-blue-500 text-white px-6 py-3 rounded-lg hover:bg-blue-600">
+                    Vytvořit první scénu
+                </button>
+            </div>
+            
+            <div id="scene-timeline" class="flex overflow-x-auto space-x-6 pb-6 pt-2">
+                <!-- Scene nodes will be rendered here -->
+            </div>
+        </div>
+
+        <!-- Kanban View -->
+        <div id="kanban-view" class="hidden">
+            <div class="grid grid-cols-1 md:grid-cols-4 gap-6">
+                <div class="kanban-column">
+                    <h3 class="font-semibold mb-3 flex justify-between">
+                        <span>Setup <span id="setup-count" class="text-gray-500 text-sm">(0)</span></span>
+                    </h3>
+                    <div id="setup-scenes" class="space-y-3 min-h-48 bg-gray-50 p-3 rounded-lg">
+                        <!-- Setup scenes will be here -->
+                    </div>
+                </div>
+                
+                <div class="kanban-column">
+                    <h3 class="font-semibold mb-3 flex justify-between">
+                        <span>Development <span id="development-count" class="text-gray-500 text-sm">(0)</span></span>
+                    </h3>
+                    <div id="development-scenes" class="space-y-3 min-h-48 bg-gray-50 p-3 rounded-lg">
+                        <!-- Development scenes will be here -->
+                    </div>
+                </div>
+                
+                <div class="kanban-column">
+                    <h3 class="font-semibold mb-3 flex justify-between">
+                        <span>Climax <span id="climax-count" class="text-gray-500 text-sm">(0)</span></span>
+                    </h3>
+                    <div id="climax-scenes" class="space-y-3 min-h-48 bg-gray-50 p-3 rounded-lg">
+                        <!-- Climax scenes will be here -->
+                    </div>
+                </div>
+                
+                <div class="kanban-column">
+                    <h3 class="font-semibold mb-3 flex justify-between">
+                        <span>Resolution <span id="resolution-count" class="text-gray-500 text-sm">(0)</span></span>
+                    </h3>
+                    <div id="resolution-scenes" class="space-y-3 min-h-48 bg-gray-50 p-3 rounded-lg">
+                        <!-- Resolution scenes will be here -->
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Graph View -->
+        <div id="graph-view" class="hidden">
+            <div class="text-center py-12 bg-gray-50 rounded-lg">
+                <p class="text-gray-600">Graf vztahů mezi scénami a objekty bude implementován.</p>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Collaboration Panel -->
+    <div class="bg-white rounded-xl shadow-lg p-6">
+        <div class="flex items-center justify-between">
+            <h3 class="text-xl font-bold text-gray-800">Spolupráce</h3>
+            <button id="collaboration-toggle" onclick="toggleCollaborationPanel()" class="text-sm px-2 py-1 rounded-lg bg-gray-100">▼</button>
+        </div>
+        
+        <div id="collaboration-content" class="hidden mt-4">
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+                <div>
+                    <h4 class="font-medium mb-2">Aktivní uživatelé</h4>
+                    <div id="active-users" class="bg-gray-50 p-3 rounded-lg min-h-16">
+                        <p class="text-gray-500 text-sm">Žádní aktivní uživatelé</p>
+                    </div>
+                </div>
+                
+                <div>
+                    <h4 class="font-medium mb-2">Komentáře</h4>
+                    <div id="comments-list" class="bg-gray-50 p-3 rounded-lg min-h-16">
+                        <p class="text-gray-500 text-sm">Žádné komentáře</p>
+                    </div>
+                </div>
+                
+                <div>
+                    <h4 class="font-medium mb-2">Pozvat spolupracovníky</h4>
+                    <div class="flex">
+                        <input type="email" id="collaborator-email" placeholder="Email" class="flex-1 p-2 border border-gray-300 rounded-l-lg">
+                        <button onclick="inviteCollaborator()" class="bg-blue-500 text-white px-4 py-2 rounded-r-lg hover:bg-blue-600">
+                            Pozvat
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Scene Details Panel -->
+    <div id="scene-details-panel" class="hidden bg-white rounded-xl shadow-lg">
+        <div class="p-6 border-b border-gray-200">
+            <div class="flex items-center justify-between">
+                <h3 class="text-xl font-bold text-gray-800">Detail scény</h3>
+                <button onclick="closeScenePanel()" class="text-gray-500 hover:text-gray-700">✕</button>
+            </div>
+        </div>
+        
+        <div class="p-6">
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Název scény</label>
+                    <input type="text" id="scene-title-input" class="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500">
+                </div>
+                
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Typ scény</label>
+                    <select id="scene-type-select" class="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500">
+                        <option value="opening">Úvod</option>
+                        <option value="inciting">Spouštěč</option>
+                        <option value="development">Rozvoj</option>
+                        <option value="rising_action">Stoupání</option>
+                        <option value="climax">Vrchol</option>
+                        <option value="falling_action">Klesání</option>
+                        <option value="resolution">Rozuzlení</option>
+                    </select>
+                </div>
+            </div>
+            
+            <div class="mb-6">
+                <label class="block text-sm font-medium text-gray-700 mb-1">Lokace</label>
+                <input type="text" id="scene-location-input" class="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500">
+            </div>
+            
+            <div class="mb-6">
+                <label class="block text-sm font-medium text-gray-700 mb-1">Popis scény</label>
+                <textarea id="scene-description-input" rows="6" class="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"></textarea>
+                <div class="text-sm text-gray-500 mt-1">
+                    <span id="description-char-count">0</span> znaků /
+                    <span id="description-word-count">0</span> slov
+                </div>
+            </div>
+            
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Hook</label>
+                    <input type="text" id="scene-hook-input" class="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500">
+                </div>
+                
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Konflikt</label>
+                    <input type="text" id="scene-conflict-input" class="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500">
+                </div>
+            </div>
+            
+            <div class="mb-6">
+                <label class="block text-sm font-medium text-gray-700 mb-1">Emocionální intenzita</label>
+                <div class="flex items-center space-x-4">
+                    <input type="range" id="intensity-slider" min="0" max="1" step="0.1" value="0.5" class="w-full">
+                    <span id="intensity-value">0.5</span>
+                </div>
+                <div class="mt-2 w-full bg-gray-200 rounded-full h-2.5">
+                    <div id="intensity-indicator" class="bg-blue-600 h-2.5 rounded-full" style="width: 50%"></div>
+                </div>
+            </div>
+            
+            <div class="mb-6">
+                <label class="block text-sm font-medium text-gray-700 mb-1">Objekty ve scéně</label>
+                <div id="scene-objects" class="bg-gray-50 p-3 rounded-lg min-h-16">
+                    <!-- Scene objects will be rendered here -->
+                </div>
+            </div>
+            
+            <div class="flex space-x-3">
+                <button onclick="saveSceneChanges()" id="save-scene-btn" class="bg-blue-500 text-white px-6 py-3 rounded-lg hover:bg-blue-600">
+                    💾 Uložit
+                </button>
+                <button onclick="deleteCurrentScene()" class="bg-red-500 text-white px-6 py-3 rounded-lg hover:bg-red-600">
+                    🗑️ Smazat scénu
+                </button>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Structure Analysis Panel -->
+    <div id="structure-analysis-panel" class="hidden bg-white rounded-xl shadow-lg">
+        <div class="p-6 border-b border-gray-200">
+            <div class="flex items-center justify-between">
+                <h3 class="text-xl font-bold text-gray-800">AI Analýza struktury</h3>
+                <button onclick="closeStructureAnalysis()" class="text-gray-500 hover:text-gray-700">✕</button>
+            </div>
+        </div>
+        
+        <div id="structure-analysis-content" class="p-6">
+            <!-- Analysis content will be rendered here -->
+        </div>
+    </div>
+    
+    <!-- AI Suggestions Panel -->
+    <div id="ai-suggestions-panel" class="hidden bg-white rounded-xl shadow-lg">
+        <div class="p-6 border-b border-gray-200">
+            <div class="flex items-center justify-between">
+                <h3 class="text-xl font-bold text-gray-800">AI návrhy scén</h3>
+                <button onclick="closeAISuggestions()" class="text-gray-500 hover:text-gray-700">✕</button>
+            </div>
+            
+            <div class="mt-4">
+                <div class="flex items-center space-x-4">
+                    <label class="text-sm font-medium text-gray-700">Zaměření:</label>
+                    <select id="suggestion-focus-select" class="p-2 border border-gray-300 rounded-lg">
+                        <option value="any">Jakákoli scéna</option>
+                        <option value="development">Development</option>
+                        <option value="climax">Climax</option>
+                        <option value="resolution">Resolution</option>
+                    </select>
+                </div>
+            </div>
+        </div>
+        
+        <div id="ai-suggestions-list" class="p-6 space-y-4">
+            <!-- AI suggestions will be rendered here -->
+        </div>
+    </div>
+</div>
