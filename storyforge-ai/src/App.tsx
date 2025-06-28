@@ -15,9 +15,9 @@ import LoadingSpinner from './components/ui/LoadingSpinner';
 
 // Lazy-loaded routes for better performance
 const SceneEditor = lazy(() => import('./pages/SceneEditor'));
-const StoryEditor = lazy(() => import('./pages/StoryEditor'));
+const StoryEditor = lazy(() => import('./pages/StoryPhase'));
 const ObjectManager = lazy(() => import('./pages/ObjectManager'));
-const AIWorkshop = lazy(() => import('./pages/AIWorkshop'));
+const AIWorkshop = lazy(() => import('./pages/AIFeaturesPage'));
 
 function App() {
   const { isAuthenticated, isLoading } = useAuth();

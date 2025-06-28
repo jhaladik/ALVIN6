@@ -1,7 +1,7 @@
 // src/context/SocketContext.tsx
 import React, { createContext, useContext, useEffect, useState } from 'react';
 import { io, Socket } from 'socket.io-client';
-import { useAuth } from '../hooks/useAuth';
+import { useAuth } from './AuthContext';
 
 interface SocketContextProps {
   socket: Socket | null;
@@ -29,7 +29,7 @@ export interface TypingUser {
   timestamp: string;
 }
 
-export const SocketContext = createContext<SocketContextProps>({
+const SocketContext = createContext<SocketContextProps>({
   socket: null,
   isConnected: false,
   activeUsers: [],

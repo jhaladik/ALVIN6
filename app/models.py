@@ -223,7 +223,7 @@ class Story(db.Model):
     title = db.Column(db.String(255), nullable=False)
     premise = db.Column(db.Text)
     content = db.Column(db.Text)
-    metadata = db.Column(db.Text)  # JSON string with genre, theme, etc.
+    story_metadata = db.Column(db.Text)  # JSON string with genre, theme, etc.
     word_count = db.Column(db.Integer, default=0)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     updated_at = db.Column(db.DateTime)
