@@ -14,7 +14,7 @@ from werkzeug.utils import secure_filename
 story_bp = Blueprint('story', __name__)
 
 @story_bp.route('/projects/<project_id>/story', methods=['GET'])
-@login_required
+@token_required
 def get_story(project_id):
     """Get story for a project"""
     user_id = session['user_id']
@@ -65,7 +65,7 @@ def get_story(project_id):
     })
 
 @story_bp.route('/projects/<project_id>/generate-story', methods=['POST'])
-@login_required
+@token_required
 @track_ai_operation('generate_story')
 def generate_story(project_id):
     """Generate story from scenes"""
@@ -181,7 +181,7 @@ def generate_story(project_id):
         return jsonify({'error': f'Failed to generate story: {str(e)}'}), 500
 
 @story_bp.route('/projects/<project_id>/story', methods=['PUT'])
-@login_required
+@token_required
 def update_story(project_id):
     """Update existing story"""
     user_id = session['user_id']
@@ -243,7 +243,7 @@ def update_story(project_id):
         return jsonify({'error': f'Failed to update story: {str(e)}'}), 500
 
 @story_bp.route('/projects/<project_id>/regenerate-section', methods=['POST'])
-@login_required
+@token_required
 @track_ai_operation('regenerate_section')
 def regenerate_section(project_id):
     """Regenerate a specific section of the story"""
@@ -348,7 +348,7 @@ def regenerate_section(project_id):
         return jsonify({'error': f'Failed to regenerate section: {str(e)}'}), 500
 
 @story_bp.route('/projects/<project_id>/export-story', methods=['GET'])
-@login_required
+@token_required
 def export_story(project_id):
     """Export story in various formats"""
     user_id = session['user_id']

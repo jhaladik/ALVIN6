@@ -1,7 +1,7 @@
 // File: src/components/projects/EditProjectModal.tsx
 import { useState, FormEvent, useEffect } from 'react'
 import { Dialog } from '@headlessui/react'
-import Button from '../ui/Button'
+import Button from '../ui/Button.tsx'
 import { Project } from '../../types'
 import { XMarkIcon } from '@heroicons/react/24/outline'
 

@@ -1,10 +1,12 @@
-# app/models.py - EXTENDED Database Models with Project Attributes
+# app/models.py - COMPLETE Database Models with Fixed Foreign Key References
 from app import db
 from datetime import datetime
 import uuid
+import json
 from werkzeug.security import generate_password_hash, check_password_hash
 
 class User(db.Model):
+    """User model for authentication and user management"""
     __tablename__ = 'user'
     
     id = db.Column(db.Integer, primary_key=True)
@@ -38,7 +40,75 @@ class User(db.Model):
             'created_at': self.created_at.isoformat() if self.created_at else None
         }
 
+class BillingPlan(db.Model):
+    """Billing plans for subscription management"""
+    __tablename__ = 'billing_plan'
+    
+    id = db.Column(db.Integer, primary_key=True)
+    name = db.Column(db.String(50), unique=True, nullable=False, index=True)
+    display_name = db.Column(db.String(100), nullable=False)
+    monthly_token_limit = db.Column(db.Integer, nullable=False)
+    max_projects = db.Column(db.Integer, default=-1)  # -1 = unlimited
+    max_collaborators = db.Column(db.Integer, default=0)
+    monthly_price_cents = db.Column(db.Integer, nullable=False)
+    token_overage_price_per_1k_cents = db.Column(db.Integer, default=0)
+    features = db.Column(db.JSON)
+    is_active = db.Column(db.Boolean, default=True)
+    is_public = db.Column(db.Boolean, default=True)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    
+    # Relationships
+    subscriptions = db.relationship('UserSubscription', backref='plan', lazy='dynamic')
+    
+    def to_dict(self):
+        return {
+            'id': self.id,
+            'name': self.name,
+            'display_name': self.display_name,
+            'monthly_token_limit': self.monthly_token_limit,
+            'max_projects': self.max_projects,
+            'max_collaborators': self.max_collaborators,
+            'monthly_price_cents': self.monthly_price_cents,
+            'token_overage_price_per_1k_cents': self.token_overage_price_per_1k_cents,
+            'features': self.features or [],
+            'is_active': self.is_active,
+            'is_public': self.is_public
+        }
+
+class UserSubscription(db.Model):
+    """User subscription to billing plans"""
+    __tablename__ = 'user_subscription'
+    
+    id = db.Column(db.Integer, primary_key=True)
+    user_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False, index=True)
+    plan_id = db.Column(db.Integer, db.ForeignKey('billing_plan.id'), nullable=False, index=True)
+    status = db.Column(db.String(20), default='active', index=True)
+    stripe_subscription_id = db.Column(db.String(100), unique=True)
+    stripe_customer_id = db.Column(db.String(100))
+    current_period_start = db.Column(db.DateTime, nullable=False)
+    current_period_end = db.Column(db.DateTime, nullable=False)
+    cancel_at_period_end = db.Column(db.Boolean, default=False)
+    tokens_used_this_period = db.Column(db.Integer, default=0)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    
+    # Relationships
+    user = db.relationship('User', backref='subscription')
+    
+    def to_dict(self):
+        return {
+            'id': self.id,
+            'user_id': self.user_id,
+            'plan': self.plan.to_dict() if self.plan else None,
+            'status': self.status,
+            'current_period_start': self.current_period_start.isoformat() if self.current_period_start else None,
+            'current_period_end': self.current_period_end.isoformat() if self.current_period_end else None,
+            'cancel_at_period_end': self.cancel_at_period_end,
+            'tokens_used_this_period': self.tokens_used_this_period
+        }
+
 class Project(db.Model):
+    """Main project model for story projects"""
     __tablename__ = 'project'
     
     id = db.Column(db.String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
@@ -50,7 +120,7 @@ class Project(db.Model):
     current_word_count = db.Column(db.Integer, default=0)
     status = db.Column(db.String(20), default='active')
     
-    # NEW: Additional project metadata
+    # Additional project metadata
     attributes = db.Column(db.JSON)  # For story_intent, themes, etc.
     tone = db.Column(db.String(50))  # dark, light, mysterious, comedic
     target_audience = db.Column(db.String(50))  # children, YA, adult
@@ -68,14 +138,19 @@ class Project(db.Model):
     # Relationships
     scenes = db.relationship('Scene', backref='project', lazy='dynamic', cascade='all, delete-orphan')
     story_objects = db.relationship('StoryObject', backref='project', lazy='dynamic', cascade='all, delete-orphan')
+    collaborators = db.relationship('ProjectCollaborator', backref='project', lazy='dynamic', cascade='all, delete-orphan')
+    comments = db.relationship('Comment', backref='project', lazy='dynamic', cascade='all, delete-orphan')
+    token_usage_logs = db.relationship('TokenUsageLog', backref='project', lazy='dynamic')
     
     def to_dict(self):
-        return {
+        """Convert project to dictionary"""
+        result = {
             'id': self.id,
             'title': self.title,
             'description': self.description,
             'genre': self.genre,
             'current_phase': self.current_phase,
+            'target_word_count': self.target_word_count,
             'current_word_count': self.current_word_count,
             'scene_count': self.scenes.count(),
             'tone': self.tone,
@@ -86,8 +161,18 @@ class Project(db.Model):
             'created_at': self.created_at.isoformat() if self.created_at else None,
             'updated_at': self.updated_at.isoformat() if self.updated_at else None
         }
+        
+        # Add story info if available
+        story = Story.query.filter_by(project_id=self.id).first()
+        if story:
+            result['story_id'] = story.id
+            result['story_title'] = story.title
+            result['word_count'] = story.word_count
+        
+        return result
 
 class Scene(db.Model):
+    """Scene model for individual story scenes"""
     __tablename__ = 'scene'
     
     id = db.Column(db.Integer, primary_key=True)
@@ -101,7 +186,7 @@ class Scene(db.Model):
     word_count = db.Column(db.Integer, default=0)
     dialog_count = db.Column(db.Integer, default=0)
     
-    # NEW: Additional scene metadata
+    # Additional scene metadata
     hook = db.Column(db.Text)  # Scene hook/opening
     character_focus = db.Column(db.String(200))  # Which character is focus
     
@@ -109,11 +194,13 @@ class Scene(db.Model):
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
     
-    # Foreign Keys
+    # Foreign Keys - FIXED: Reference correct table name
     project_id = db.Column(db.String(36), db.ForeignKey('project.id'), nullable=False, index=True)
     
     # Relationships
     scene_objects = db.relationship('SceneObject', backref='scene', lazy='dynamic', cascade='all, delete-orphan')
+    comments = db.relationship('Comment', backref='scene', lazy='dynamic', cascade='all, delete-orphan')
+    token_usage_logs = db.relationship('TokenUsageLog', backref='scene', lazy='dynamic')
     
     def to_dict(self):
         return {
@@ -130,10 +217,12 @@ class Scene(db.Model):
             'hook': self.hook,
             'character_focus': self.character_focus,
             'objects': [so.story_object.to_dict() for so in self.scene_objects.all()],
-            'created_at': self.created_at.isoformat() if self.created_at else None
+            'created_at': self.created_at.isoformat() if self.created_at else None,
+            'updated_at': self.updated_at.isoformat() if self.updated_at else None
         }
 
 class StoryObject(db.Model):
+    """Story objects (characters, locations, props, conflicts)"""
     __tablename__ = 'story_object'
     
     id = db.Column(db.Integer, primary_key=True)
@@ -144,12 +233,12 @@ class StoryObject(db.Model):
     status = db.Column(db.String(20), default='active', index=True)
     attributes = db.Column(db.JSON)
     
-    # NEW: Additional object metadata
+    # Additional object metadata
     first_appearance = db.Column(db.Integer)  # Scene order where first appears
     symbolic_meaning = db.Column(db.Text)  # Symbolic significance
     character_role = db.Column(db.String(50))  # For characters: protagonist, antagonist, etc.
     
-    # Foreign Keys
+    # Foreign Keys - FIXED: Reference correct table name
     project_id = db.Column(db.String(36), db.ForeignKey('project.id'), nullable=False, index=True)
     
     # Relationships
@@ -178,59 +267,35 @@ class SceneObject(db.Model):
     role = db.Column(db.String(50))
     transformation = db.Column(db.Text)
     
-    # NEW: Additional relationship metadata
+    # Additional relationship metadata
     significance = db.Column(db.String(20), default='supporting')  # main, supporting, background
     interaction_type = db.Column(db.String(50))  # dialogue, action, presence
     
-    # Foreign Keys
+    # Foreign Keys - FIXED: Reference correct table names
     scene_id = db.Column(db.Integer, db.ForeignKey('scene.id'), nullable=False, index=True)
     object_id = db.Column(db.Integer, db.ForeignKey('story_object.id'), nullable=False, index=True)
 
-# NEW: Template system for idea generation
-class IdeaTemplate(db.Model):
-    """Predefined templates for idea generation"""
-    __tablename__ = 'idea_template'
-    
-    id = db.Column(db.Integer, primary_key=True)
-    name = db.Column(db.String(100), nullable=False)
-    genre = db.Column(db.String(50), index=True)
-    prompt_template = db.Column(db.Text, nullable=False)
-    example_variables = db.Column(db.JSON)
-    description = db.Column(db.Text)
-    is_active = db.Column(db.Boolean, default=True)
-    usage_count = db.Column(db.Integer, default=0)
-    
-    created_at = db.Column(db.DateTime, default=datetime.utcnow)
-    
-    def to_dict(self):
-        return {
-            'id': self.id,
-            'name': self.name,
-            'genre': self.genre,
-            'prompt_template': self.prompt_template,
-            'example_variables': self.example_variables or {},
-            'description': self.description,
-            'usage_count': self.usage_count
-        }
-# Add to app/models.py
-
 class Story(db.Model):
     """Story model - final narrative content generated from scenes"""
-    __tablename__ = 'stories'
+    __tablename__ = 'story'
     
     id = db.Column(db.Integer, primary_key=True)
-    project_id = db.Column(db.Integer, db.ForeignKey('projects.id'), nullable=False, index=True)
     title = db.Column(db.String(255), nullable=False)
     premise = db.Column(db.Text)
     content = db.Column(db.Text)
     story_metadata = db.Column(db.Text)  # JSON string with genre, theme, etc.
     word_count = db.Column(db.Integer, default=0)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
-    updated_at = db.Column(db.DateTime)
+    updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    
+    # Foreign Keys - FIXED: Reference correct table name and type
+    project_id = db.Column(db.String(36), db.ForeignKey('project.id'), nullable=False, index=True)
     
     # Relationships
-    project = db.relationship('Project', backref=db.backref('story', uselist=False))
     chapters = db.relationship('StoryChapter', backref='story', cascade='all, delete-orphan')
+    
+    # Add relationship back to project
+    project = db.relationship('Project', backref=db.backref('story', uselist=False))
     
     def to_dict(self):
         """Convert to dictionary"""
@@ -240,7 +305,7 @@ class Story(db.Model):
             'title': self.title,
             'premise': self.premise,
             'content': self.content,
-            'metadata': json.loads(self.metadata) if self.metadata else {},
+            'metadata': json.loads(self.story_metadata) if self.story_metadata else {},
             'word_count': self.word_count,
             'created_at': self.created_at.isoformat() if self.created_at else None,
             'updated_at': self.updated_at.isoformat() if self.updated_at else None
@@ -248,16 +313,18 @@ class Story(db.Model):
 
 class StoryChapter(db.Model):
     """Chapter model - sections of a story"""
-    __tablename__ = 'story_chapters'
+    __tablename__ = 'story_chapter'
     
     id = db.Column(db.Integer, primary_key=True)
-    story_id = db.Column(db.Integer, db.ForeignKey('stories.id'), nullable=False, index=True)
     title = db.Column(db.String(255), nullable=False)
     content = db.Column(db.Text)
     scene_ids = db.Column(db.Text)  # JSON array of scene IDs
     order = db.Column(db.Integer, default=0)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
-    updated_at = db.Column(db.DateTime)
+    updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    
+    # Foreign Keys - FIXED: Reference correct table name
+    story_id = db.Column(db.Integer, db.ForeignKey('story.id'), nullable=False, index=True)
     
     def to_dict(self):
         """Convert to dictionary"""
@@ -272,266 +339,26 @@ class StoryChapter(db.Model):
             'updated_at': self.updated_at.isoformat() if self.updated_at else None
         }
 
-# Add to Project model
-# Update the Project.to_dict() method to include story phase info
-def to_dict(self):
-    """Convert project to dictionary"""
-    result = {
-        'id': self.id,
-        'title': self.title,
-        'description': self.description,
-        'genre': self.genre,
-        'currentPhase': self.current_phase,
-        'sceneCount': Scene.query.filter_by(project_id=self.id).count(),
-        'createdAt': self.created_at.isoformat() if self.created_at else None,
-        'updatedAt': self.updated_at.isoformat() if self.updated_at else None,
-    }
-    
-    # Add story info if available
-    story = Story.query.filter_by(project_id=self.id).first()
-    if story:
-        result['storyId'] = story.id
-        result['storyTitle'] = story.title
-        result['wordCount'] = story.word_count
-    
-    return result
-
-# Database migration
-"""
-Add the following to a new migration file:
-
-# Create stories table
-op.create_table(
-    'stories',
-    sa.Column('id', sa.Integer(), nullable=False),
-    sa.Column('project_id', sa.Integer(), nullable=False),
-    sa.Column('title', sa.String(length=255), nullable=False),
-    sa.Column('premise', sa.Text(), nullable=True),
-    sa.Column('content', sa.Text(), nullable=True),
-    sa.Column('metadata', sa.Text(), nullable=True),
-    sa.Column('word_count', sa.Integer(), nullable=True),
-    sa.Column('created_at', sa.DateTime(), nullable=True),
-    sa.Column('updated_at', sa.DateTime(), nullable=True),
-    sa.ForeignKeyConstraint(['project_id'], ['projects.id'], ),
-    sa.PrimaryKeyConstraint('id')
-)
-op.create_index(op.f('ix_stories_project_id'), 'stories', ['project_id'], unique=False)
-
-# Create story_chapters table
-op.create_table(
-    'story_chapters',
-    sa.Column('id', sa.Integer(), nullable=False),
-    sa.Column('story_id', sa.Integer(), nullable=False),
-    sa.Column('title', sa.String(length=255), nullable=False),
-    sa.Column('content', sa.Text(), nullable=True),
-    sa.Column('scene_ids', sa.Text(), nullable=True),
-    sa.Column('order', sa.Integer(), nullable=True),
-    sa.Column('created_at', sa.DateTime(), nullable=True),
-    sa.Column('updated_at', sa.DateTime(), nullable=True),
-    sa.ForeignKeyConstraint(['story_id'], ['stories.id'], ),
-    sa.PrimaryKeyConstraint('id')
-)
-op.create_index(op.f('ix_story_chapters_story_id'), 'story_chapters', ['story_id'], unique=False)
-"""
-
-class TokenUsageLog(db.Model):
-    """Log of all token operations for analytics and billing"""
-    __tablename__ = 'token_usage_log'
-    
-    id = db.Column(db.Integer, primary_key=True)
-    user_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False, index=True)
-    operation_type = db.Column(db.String(50), nullable=False, index=True)
-    
-    # Token details
-    input_tokens = db.Column(db.Integer, default=0)
-    output_tokens = db.Column(db.Integer, default=0)
-    total_cost = db.Column(db.Integer, nullable=False)
-    multiplier = db.Column(db.Float, default=1.0)
-    
-    # Context
-    project_id = db.Column(db.String(36), db.ForeignKey('project.id'), index=True)
-    scene_id = db.Column(db.Integer, db.ForeignKey('scene.id'), index=True)
-    
-    # Metadata
-    operation_metadata = db.Column(db.JSON)
-    ai_model_used = db.Column(db.String(50))
-    response_time_ms = db.Column(db.Integer)
-    
-    # Billing
-    billable = db.Column(db.Boolean, default=True)
-    billed_at = db.Column(db.DateTime)
-    
-    created_at = db.Column(db.DateTime, default=datetime.utcnow, index=True)
-    
-    # Relationships
-    user = db.relationship('User', backref='token_usage_logs')
-    project = db.relationship('Project', backref='token_usage_logs')
-    scene = db.relationship('Scene', backref='token_usage_logs')
-    
-    def to_dict(self):
-        return {
-            'id': self.id,
-            'operation_type': self.operation_type,
-            'input_tokens': self.input_tokens,
-            'output_tokens': self.output_tokens,
-            'total_cost': self.total_cost,
-            'project_id': self.project_id,
-            'scene_id': self.scene_id,
-            'ai_model_used': self.ai_model_used,
-            'response_time_ms': self.response_time_ms,
-            'operation_metadata': self.operation_metadata,  # Updated name
-            'created_at': self.created_at.isoformat() if self.created_at else None
-        }
-
-class BillingPlan(db.Model):
-    """Available billing plans"""
-    __tablename__ = 'billing_plan'
-    
-    id = db.Column(db.Integer, primary_key=True)
-    name = db.Column(db.String(50), unique=True, nullable=False)
-    display_name = db.Column(db.String(100), nullable=False)
-    
-    # Limits
-    monthly_token_limit = db.Column(db.Integer, nullable=False)
-    max_projects = db.Column(db.Integer, default=-1)  # -1 = unlimited
-    max_collaborators = db.Column(db.Integer, default=0)
-    
-    # Pricing
-    monthly_price_cents = db.Column(db.Integer, default=0)  # in cents
-    token_overage_price_per_1k_cents = db.Column(db.Integer, default=0)
-    
-    # Features
-    features = db.Column(db.JSON)  # List of enabled features
-    
-    # Status
-    is_active = db.Column(db.Boolean, default=True)
-    is_public = db.Column(db.Boolean, default=True)
-    
-    created_at = db.Column(db.DateTime, default=datetime.utcnow)
-    
-    def to_dict(self):
-        return {
-            'id': self.id,
-            'name': self.name,
-            'display_name': self.display_name,
-            'monthly_token_limit': self.monthly_token_limit,
-            'max_projects': self.max_projects,
-            'max_collaborators': self.max_collaborators,
-            'monthly_price': self.monthly_price_cents / 100.0,
-            'token_overage_price_per_1k': self.token_overage_price_per_1k_cents / 100.0,
-            'features': self.features or []
-        }
-
-class UserSubscription(db.Model):
-    """User subscription details"""
-    __tablename__ = 'user_subscription'
-    
-    id = db.Column(db.Integer, primary_key=True)
-    user_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False, unique=True)
-    plan_id = db.Column(db.Integer, db.ForeignKey('billing_plan.id'), nullable=False)
-    
-    # Subscription status
-    status = db.Column(db.String(20), default='active')  # active, cancelled, expired, trial
-    
-    # Billing cycle
-    current_period_start = db.Column(db.DateTime, nullable=False)
-    current_period_end = db.Column(db.DateTime, nullable=False)
-    
-    # Token usage this period
-    tokens_used_this_period = db.Column(db.Integer, default=0)
-    tokens_purchased_this_period = db.Column(db.Integer, default=0)
-    
-    # Payment
-    stripe_subscription_id = db.Column(db.String(100))
-    stripe_customer_id = db.Column(db.String(100))
-    
-    # Trial
-    trial_start = db.Column(db.DateTime)
-    trial_end = db.Column(db.DateTime)
-    
-    created_at = db.Column(db.DateTime, default=datetime.utcnow)
-    updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
-    
-    # Relationships
-    user = db.relationship('User', backref=db.backref('subscription', uselist=False))
-    plan = db.relationship('BillingPlan', backref='subscriptions')
-    
-    def to_dict(self):
-        return {
-            'id': self.id,
-            'plan': self.plan.to_dict() if self.plan else None,
-            'status': self.status,
-            'current_period_start': self.current_period_start.isoformat() if self.current_period_start else None,
-            'current_period_end': self.current_period_end.isoformat() if self.current_period_end else None,
-            'tokens_used_this_period': self.tokens_used_this_period,
-            'tokens_purchased_this_period': self.tokens_purchased_this_period,
-            'is_trial': bool(self.trial_end and self.trial_end > datetime.utcnow()),
-            'trial_end': self.trial_end.isoformat() if self.trial_end else None
-        }
-
-class TokenPurchase(db.Model):
-    """Record of token purchases"""
-    __tablename__ = 'token_purchase'
-    
-    id = db.Column(db.Integer, primary_key=True)
-    user_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
-    
-    # Purchase details
-    tokens_purchased = db.Column(db.Integer, nullable=False)
-    price_paid_cents = db.Column(db.Integer, nullable=False)
-    currency = db.Column(db.String(3), default='USD')
-    
-    # Payment
-    payment_method = db.Column(db.String(20))  # stripe, paypal, etc.
-    payment_id = db.Column(db.String(100))
-    payment_status = db.Column(db.String(20), default='pending')  # pending, completed, failed, refunded
-    
-    # Metadata
-    purchase_reason = db.Column(db.String(100))  # overage, bulk_purchase, bonus
-    admin_notes = db.Column(db.Text)
-    
-    created_at = db.Column(db.DateTime, default=datetime.utcnow)
-    completed_at = db.Column(db.DateTime)
-    
-    # Relationships
-    user = db.relationship('User', backref='token_purchases')
-    
-    def to_dict(self):
-        return {
-            'id': self.id,
-            'tokens_purchased': self.tokens_purchased,
-            'price_paid': self.price_paid_cents / 100.0,
-            'currency': self.currency,
-            'payment_status': self.payment_status,
-            'purchase_reason': self.purchase_reason,
-            'created_at': self.created_at.isoformat() if self.created_at else None,
-            'completed_at': self.completed_at.isoformat() if self.completed_at else None
-        }
-
 class ProjectCollaborator(db.Model):
-    """Project collaboration permissions"""
+    """Collaboration permissions for projects"""
     __tablename__ = 'project_collaborator'
     
     id = db.Column(db.Integer, primary_key=True)
-    project_id = db.Column(db.String(36), db.ForeignKey('project.id'), nullable=False)
-    user_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
+    role = db.Column(db.String(20), default='viewer', index=True)
+    permissions = db.Column(db.JSON)
+    status = db.Column(db.String(20), default='pending', index=True)
+    invitation_token = db.Column(db.String(100), unique=True)
     
-    # Permissions
-    role = db.Column(db.String(20), default='viewer')  # owner, editor, commenter, viewer
-    permissions = db.Column(db.JSON)  # Detailed permissions object
-    
-    # Status
-    status = db.Column(db.String(20), default='pending')  # pending, active, declined, removed
-    invitation_token = db.Column(db.String(100))
-    
-    # Metadata
+    # Foreign Keys - FIXED: Reference correct table names
+    project_id = db.Column(db.String(36), db.ForeignKey('project.id'), nullable=False, index=True)
+    user_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False, index=True)
     invited_by = db.Column(db.Integer, db.ForeignKey('user.id'))
+    
     invited_at = db.Column(db.DateTime, default=datetime.utcnow)
     joined_at = db.Column(db.DateTime)
     last_access = db.Column(db.DateTime)
     
     # Relationships
-    project = db.relationship('Project', backref='collaborators')
     user = db.relationship('User', foreign_keys=[user_id], backref='collaborations')
     inviter = db.relationship('User', foreign_keys=[invited_by])
     
@@ -585,8 +412,6 @@ class Comment(db.Model):
     updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
     
     # Relationships
-    project = db.relationship('Project', backref='comments')
-    scene = db.relationship('Scene', backref='comments')
     user = db.relationship('User', foreign_keys=[user_id], backref='comments')
     resolver = db.relationship('User', foreign_keys=[resolved_by])
     replies = db.relationship('Comment', backref=db.backref('parent', remote_side=[id]))
@@ -608,4 +433,78 @@ class Comment(db.Model):
             'position_data': self.position_data,
             'created_at': self.created_at.isoformat() if self.created_at else None,
             'updated_at': self.updated_at.isoformat() if self.updated_at else None
+        }
+
+class TokenUsageLog(db.Model):
+    """Log of all token operations for analytics and billing"""
+    __tablename__ = 'token_usage_log'
+    
+    id = db.Column(db.Integer, primary_key=True)
+    operation_type = db.Column(db.String(50), nullable=False, index=True)
+    
+    # Token details
+    input_tokens = db.Column(db.Integer, default=0)
+    output_tokens = db.Column(db.Integer, default=0)
+    total_cost = db.Column(db.Integer, nullable=False)
+    multiplier = db.Column(db.Float, default=1.0)
+    
+    # Context - FIXED: Reference correct table names
+    user_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False, index=True)
+    project_id = db.Column(db.String(36), db.ForeignKey('project.id'), index=True)
+    scene_id = db.Column(db.Integer, db.ForeignKey('scene.id'), index=True)
+    
+    # Metadata
+    operation_metadata = db.Column(db.JSON)
+    ai_model_used = db.Column(db.String(50))
+    response_time_ms = db.Column(db.Integer)
+    
+    # Billing
+    billable = db.Column(db.Boolean, default=True)
+    billed_at = db.Column(db.DateTime)
+    
+    created_at = db.Column(db.DateTime, default=datetime.utcnow, index=True)
+    
+    # Relationships
+    user = db.relationship('User', backref='token_usage_logs')
+    
+    def to_dict(self):
+        return {
+            'id': self.id,
+            'operation_type': self.operation_type,
+            'input_tokens': self.input_tokens,
+            'output_tokens': self.output_tokens,
+            'total_cost': self.total_cost,
+            'project_id': self.project_id,
+            'scene_id': self.scene_id,
+            'ai_model_used': self.ai_model_used,
+            'response_time_ms': self.response_time_ms,
+            'operation_metadata': self.operation_metadata,
+            'billable': self.billable,
+            'created_at': self.created_at.isoformat() if self.created_at else None
+        }
+
+class IdeaTemplate(db.Model):
+    """Predefined templates for idea generation"""
+    __tablename__ = 'idea_template'
+    
+    id = db.Column(db.Integer, primary_key=True)
+    name = db.Column(db.String(100), nullable=False)
+    genre = db.Column(db.String(50), index=True)
+    prompt_template = db.Column(db.Text, nullable=False)
+    example_variables = db.Column(db.JSON)
+    description = db.Column(db.Text)
+    is_active = db.Column(db.Boolean, default=True)
+    usage_count = db.Column(db.Integer, default=0)
+    
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    
+    def to_dict(self):
+        return {
+            'id': self.id,
+            'name': self.name,
+            'genre': self.genre,
+            'prompt_template': self.prompt_template,
+            'example_variables': self.example_variables or {},
+            'description': self.description,
+            'usage_count': self.usage_count
         }

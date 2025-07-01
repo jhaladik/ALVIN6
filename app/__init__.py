@@ -1,5 +1,6 @@
 # app/__init__.py - FIXED App Factory with proper static file handling
-from flask import Flask, render_template, send_from_directory, jsonify
+from datetime import timedelta
+from flask import Flask, render_template, send_from_directory, jsonify, request, session
 from flask_sqlalchemy import SQLAlchemy
 from flask_cors import CORS
 from flask_socketio import SocketIO
@@ -31,19 +32,33 @@ def create_app(config_name='development'):
     # Load configuration
     from config import config
     app.config.from_object(config[config_name])
-    
+
+    # Add these session configurations
+    app.config.update(
+        SESSION_COOKIE_SECURE=False,  # Set to True in production with HTTPS
+        SESSION_COOKIE_HTTPONLY=True,
+        SESSION_COOKIE_SAMESITE='Lax',
+        SESSION_COOKIE_DOMAIN=None,  # Allow localhost
+        PERMANENT_SESSION_LIFETIME=timedelta(hours=24)
+    )
     # Initialize extensions
     db.init_app(app)
-    CORS(app)
+
+    # Replace your current CORS configuration
+    CORS(app, supports_credentials=True, 
+         origins=['http://localhost:5173', 'http://localhost:3000'])
     socketio.init_app(app, cors_allowed_origins="*")
-    
+
+         
     # Register API blueprints
     from app.auth import auth_bp
     from app.projects import projects_bp
     from app.scenes import scenes_bp
     from app.ai import ai_bp
     from app.collaboration import collaboration_bp
+    from app.routes.debug import debug_bp
     
+    app.register_blueprint(debug_bp)
     app.register_blueprint(auth_bp, url_prefix='/api/auth')
     app.register_blueprint(projects_bp, url_prefix='/api/projects')
     app.register_blueprint(scenes_bp, url_prefix='/api/scenes')
@@ -210,7 +225,7 @@ def create_app(config_name='development'):
             <p>Create frontend/index.html to display your frontend application.</p>
             <a href="/">Back to API info</a>
             '''
-    
+   
     # Debug route to check static files
     @app.route('/debug/static')
     def debug_static():
@@ -238,9 +253,41 @@ def create_app(config_name='development'):
         <h2>Directory listing:</h2>
         <pre>{'<br/>'.join(static_listing) if static_listing else 'Directory empty or not found'}</pre>
         """
-    
+
+    @app.route('/debug/claude')
+    def debug_claude():
+        """Debug Claude API status"""
+        try:
+            from app.services.claude_api import ClaudeAPIClient
+            client = ClaudeAPIClient()
+            status = client.test_connection()
+            
+            return jsonify({
+                'claude_api': status,
+                'simulation_mode': client.simulation_mode,
+                'model': client.model
+            })
+            
+        except Exception as e:
+            return jsonify({
+                'error': str(e),
+                'claude_api': {
+                    'status': 'error', 
+                    'message': f'Failed to initialize Claude client: {str(e)}'
+                }
+            }), 500
+
     # Register CLI commands
-    from app.cli import init_db_command
-    app.cli.add_command(init_db_command)
+    from app.cli import register_commands
+    register_commands(app)
+    
+    # Add this before the "return app" line
+    @app.after_request
+    def after_request_func(response):
+        print(f"🔍 Request: {request.method} {request.path}")
+        print(f"🍪 Session: {dict(session)}")
+        print(f"🔄 Response status: {response.status_code}")
+        print(f"📝 Response headers: {dict(response.headers)}")
+        return response
     
     return app

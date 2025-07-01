@@ -6,13 +6,13 @@ from app.utils.auth import login_required
 from app import db
 
 @projects_bp.route('', methods=['GET'])
-@login_required
+@token_required
 def get_projects():
     projects = Project.query.filter_by(user_id=session['user_id']).all()
     return jsonify([p.to_dict() for p in projects])
 
 @projects_bp.route('', methods=['POST'])
-@login_required
+@token_required
 def create_project():
     data = request.get_json()
     
@@ -29,7 +29,7 @@ def create_project():
     return jsonify({'success': True, 'project': project.to_dict()})
 
 @projects_bp.route('/<project_id>', methods=['GET'])
-@login_required
+@token_required
 def get_project(project_id):
     project = Project.query.filter_by(id=project_id, user_id=session['user_id']).first()
     if not project:

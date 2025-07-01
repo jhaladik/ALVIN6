@@ -31,7 +31,7 @@ const phases: Array<{
     id: 'expand',
     name: 'Expand Phase',
     description: 'Develop characters, locations, and key scenes of your story.',
-    icon: <ArrowsExpandIcon className="h-8 w-8" />,
+    icon: <ViewfinderCircleIcon className="h-8 w-8" />,
     color: 'text-purple-500 bg-purple-50'
   },
   {

@@ -1,4 +1,4 @@
-// File: src/context/AuthContext.tsx
+// storyforge-ai/src/context/AuthContext.tsx - UPDATED with JWT support
 import { createContext, useState, useEffect, ReactNode } from 'react'
 import { api } from '../services/api'
 
@@ -37,13 +37,59 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
   const [user, setUser] = useState<User | null>(null)
   const [isLoading, setIsLoading] = useState(true)
 
+  // Set up axios interceptor for JWT tokens
+  useEffect(() => {
+    // Add request interceptor to include JWT token
+    const requestInterceptor = api.interceptors.request.use(
+      (config) => {
+        const token = localStorage.getItem('authToken')
+        if (token) {
+          config.headers.Authorization = `Bearer ${token}`
+        }
+        return config
+      },
+      (error) => Promise.reject(error)
+    )
+
+    // Add response interceptor to handle token expiration
+    const responseInterceptor = api.interceptors.response.use(
+      (response) => response,
+      (error) => {
+        if (error.response?.status === 401) {
+          // Token expired or invalid
+          localStorage.removeItem('authToken')
+          setUser(null)
+          // Optionally redirect to login page
+          window.location.href = '/login'
+        }
+        return Promise.reject(error)
+      }
+    )
+
+    // Cleanup interceptors on unmount
+    return () => {
+      api.interceptors.request.eject(requestInterceptor)
+      api.interceptors.response.eject(responseInterceptor)
+    }
+  }, [])
+
   useEffect(() => {
     // Check if user is already logged in
     const checkAuthStatus = async () => {
       try {
+        const token = localStorage.getItem('authToken')
+        if (!token) {
+          setIsLoading(false)
+          return
+        }
+
+        // Try to get current user with stored token
         const { data } = await api.get('/api/auth/me')
-        setUser(data)
+        setUser(data.user)
       } catch (error) {
+        console.log('Auth check failed:', error)
+        // Remove invalid token
+        localStorage.removeItem('authToken')
         setUser(null)
       } finally {
         setIsLoading(false)
@@ -57,9 +103,18 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
     setIsLoading(true)
     try {
       const { data } = await api.post('/api/auth/login', { email, password })
-      setUser(data)
-    } catch (error) {
-      throw new Error('Invalid credentials')
+      
+      // Store token if provided (JWT mode)
+      if (data.token) {
+        localStorage.setItem('authToken', data.token)
+      }
+      
+      setUser(data.user)
+    } catch (error: any) {
+      if (error.response?.data?.error) {
+        throw new Error(error.response.data.error)
+      }
+      throw new Error('Login failed')
     } finally {
       setIsLoading(false)
     }
@@ -69,8 +124,17 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
     setIsLoading(true)
     try {
       const { data } = await api.post('/api/auth/register', { username, email, password })
-      setUser(data)
-    } catch (error) {
+      
+      // Store token if provided (JWT mode)
+      if (data.token) {
+        localStorage.setItem('authToken', data.token)
+      }
+      
+      setUser(data.user)
+    } catch (error: any) {
+      if (error.response?.data?.error) {
+        throw new Error(error.response.data.error)
+      }
       throw new Error('Registration failed')
     } finally {
       setIsLoading(false)
@@ -80,9 +144,12 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
   const logout = async () => {
     try {
       await api.post('/api/auth/logout')
-      setUser(null)
     } catch (error) {
       console.error('Logout failed', error)
+    } finally {
+      // Always clear local state
+      localStorage.removeItem('authToken')
+      setUser(null)
     }
   }
 

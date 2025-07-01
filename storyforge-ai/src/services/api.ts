@@ -10,19 +10,18 @@ export const api = axios.create({
   withCredentials: true, // Important for cookies/session authentication
 });
 
-// Add a response interceptor for error handling
+// Modify your error interceptor in api.ts
 api.interceptors.response.use(
   (response) => response,
   (error) => {
-    // Handle session expiration or unauthorized errors
-    if (error.response && error.response.status === 401) {
+    // Only redirect for 401 errors that aren't from the /api/auth/me endpoint
+    if (
+      error.response && 
+      error.response.status === 401 && 
+      !error.config.url.includes('/api/auth/me')
+    ) {
       // Redirect to login if session expired
       window.location.href = '/login';
-    }
-    
-    // Handle token related errors
-    if (error.response && error.response.data && error.response.data.token_error) {
-      console.error('Token error:', error.response.data.token_error);
     }
     
     return Promise.reject(error);

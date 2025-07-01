@@ -19,7 +19,7 @@ def get_billing_plans():
     })
 
 @billing_bp.route('/subscription', methods=['GET'])
-@login_required
+@token_required
 def get_user_subscription():
     """Get current user's subscription details"""
     user_id = session['user_id']
@@ -43,7 +43,7 @@ def get_user_subscription():
     })
 
 @billing_bp.route('/subscribe', methods=['POST'])
-@login_required
+@token_required
 def create_subscription():
     """Create new subscription"""
     data = request.get_json()
@@ -111,7 +111,7 @@ def create_subscription():
         return jsonify({'error': 'Subscription creation failed'}), 500
 
 @billing_bp.route('/upgrade', methods=['POST'])
-@login_required
+@token_required
 def upgrade_subscription():
     """Upgrade existing subscription"""
     data = request.get_json()
@@ -172,7 +172,7 @@ def upgrade_subscription():
         return jsonify({'error': 'Upgrade failed'}), 500
 
 @billing_bp.route('/cancel', methods=['POST'])
-@login_required
+@token_required
 def cancel_subscription():
     """Cancel subscription"""
     user_id = session['user_id']
@@ -218,7 +218,7 @@ def cancel_subscription():
         return jsonify({'error': 'Cancellation failed'}), 500
 
 @billing_bp.route('/buy-tokens', methods=['POST'])
-@login_required
+@token_required
 def buy_tokens():
     """Purchase additional tokens"""
     data = request.get_json()
@@ -280,7 +280,7 @@ def buy_tokens():
         return jsonify({'error': 'Token purchase failed'}), 500
 
 @billing_bp.route('/usage-analytics', methods=['GET'])
-@login_required
+@token_required
 def get_usage_analytics():
     """Get detailed usage analytics"""
     user_id = session['user_id']
@@ -302,7 +302,7 @@ def get_usage_analytics():
     })
 
 @billing_bp.route('/billing-history', methods=['GET'])
-@login_required
+@token_required
 def get_billing_history():
     """Get billing history for user"""
     user_id = session['user_id']
@@ -314,7 +314,7 @@ def get_billing_history():
     })
 
 @billing_bp.route('/invoice/<invoice_id>', methods=['GET'])
-@login_required
+@token_required
 def get_invoice(invoice_id):
     """Get specific invoice details"""
     user_id = session['user_id']

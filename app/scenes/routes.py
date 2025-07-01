@@ -7,7 +7,7 @@ from app.services.ai_analyzer import AIAnalyzer
 from app import db
 
 @scenes_bp.route('', methods=['POST'])
-@login_required
+@token_required
 @check_tokens(5)
 def create_scene():
     data = request.get_json()

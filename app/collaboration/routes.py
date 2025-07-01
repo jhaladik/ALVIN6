@@ -13,7 +13,7 @@ import json
 collaboration_manager = CollaborationManager()
 
 @collaboration_bp.route('/projects/<project_id>/invite', methods=['POST'])
-@login_required
+@token_required
 @collaboration_permission_required('invite_collaborators')
 def invite_collaborator(project_id):
     """Invite user to collaborate on project"""
@@ -71,7 +71,7 @@ def invite_collaborator(project_id):
         return jsonify({'error': f'Invitation failed: {str(e)}'}), 500
 
 @collaboration_bp.route('/projects/<project_id>/collaborators', methods=['GET'])
-@login_required
+@token_required
 @collaboration_permission_required('view_collaborators')
 def get_collaborators(project_id):
     """Get all collaborators for project"""
@@ -86,7 +86,7 @@ def get_collaborators(project_id):
     })
 
 @collaboration_bp.route('/invitations/<invitation_token>/accept', methods=['POST'])
-@login_required
+@token_required
 def accept_invitation(invitation_token):
     """Accept collaboration invitation"""
     user_id = session['user_id']
@@ -124,7 +124,7 @@ def accept_invitation(invitation_token):
         return jsonify({'error': f'Failed to accept invitation: {str(e)}'}), 500
 
 @collaboration_bp.route('/projects/<project_id>/comments', methods=['GET'])
-@login_required
+@token_required
 @collaboration_permission_required('view_comments')
 def get_comments(project_id):
     """Get comments for project or scene"""
@@ -143,7 +143,7 @@ def get_comments(project_id):
     })
 
 @collaboration_bp.route('/projects/<project_id>/comments', methods=['POST'])
-@login_required
+@token_required
 @collaboration_permission_required('add_comments')
 def add_comment(project_id):
     """Add comment to project or scene"""
@@ -194,7 +194,7 @@ def add_comment(project_id):
         return jsonify({'error': f'Failed to add comment: {str(e)}'}), 500
 
 @collaboration_bp.route('/comments/<comment_id>/resolve', methods=['POST'])
-@login_required
+@token_required
 def resolve_comment(comment_id):
     """Resolve a comment"""
     comment = Comment.query.get(comment_id)
@@ -233,7 +233,7 @@ def resolve_comment(comment_id):
         return jsonify({'error': f'Failed to resolve comment: {str(e)}'}), 500
 
 @collaboration_bp.route('/projects/<project_id>/presence', methods=['GET'])
-@login_required
+@token_required
 @collaboration_permission_required('view_presence')
 def get_presence(project_id):
     """Get current user presence in project"""

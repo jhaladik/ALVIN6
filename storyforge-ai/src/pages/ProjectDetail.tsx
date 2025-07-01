@@ -5,9 +5,9 @@ import { api } from '../services/api';
 import { Project, Scene } from '../types';
 import LoadingSpinner from '../components/ui/LoadingSpinner';
 import Button from '../components/ui/Button';
-import EditProjectModal from '../components/projects/EditProjectModal';
+import EditProjectModal from '../components/projects/EditProjectModal.tsx';
 import DeleteProjectModal from '../components/projects/DeleteProjectModal';
-import ProjectPhaseSelector from '../components/projects/ProjectPhaseSelector';
+import ProjectPhaseSelector from '../components/projects/ProjectPhaseSelector.tsx';
 import { useSocket } from '../hooks/useSocket';
 import {
   PencilIcon,
@@ -15,7 +15,9 @@ import {
   UserIcon,
   ClockIcon,
   DocumentTextIcon,
-  ViewBoardsIcon,
+  // ViewBoardsIcon doesn't exist in current Heroicons version
+  // Replacing with appropriate alternatives:
+  Squares2X2Icon, // Replacement for ViewBoardsIcon
   CubeIcon,
   SparklesIcon,
   ExclamationCircleIcon,
@@ -64,12 +66,12 @@ const ProjectDetail = () => {
     loadProjectData();
   }, [projectId]);
   
-  // Setup real-time socket for collaborative editing
+  // Socket connection for real-time updates
   useEffect(() => {
     if (!socket || !isConnected || !projectId) return;
     
     // Join project room
-    socket.emit('join_project', { projectId });
+    socket.emit('join_project', projectId);
     
     // Listen for project updates
     socket.on('project_updated', (updatedProject: Project) => {
@@ -79,74 +81,45 @@ const ProjectDetail = () => {
     });
     
     // Listen for scene updates
-    socket.on('scene_updated', (updatedScene: Scene) => {
-      setRecentScenes(prev => {
-        // Check if the scene is already in our list
-        const exists = prev.some(scene => scene.id === updatedScene.id);
-        
-        if (exists) {
-          // Update the existing scene
-          return prev.map(scene => 
-            scene.id === updatedScene.id ? updatedScene : scene
-          );
-        } else if (prev.length < 5) {
-          // Add the new scene if we have less than 5
-          return [...prev, updatedScene];
-        } else {
-          // Replace the oldest scene with the new one
-          return [...prev.slice(1), updatedScene];
-        }
-      });
+    socket.on('scene_updated', () => {
+      // Refresh scenes list
+      api.get(`/api/projects/${projectId}/scenes?limit=5&sort=last_modified`)
+        .then(response => setRecentScenes(response.data))
+        .catch(err => console.error('Failed to refresh scenes', err));
     });
     
     return () => {
-      // Leave project room on unmount
-      socket.emit('leave_project', { projectId });
+      // Leave project room and remove listeners
+      socket.emit('leave_project', projectId);
       socket.off('project_updated');
       socket.off('scene_updated');
     };
   }, [socket, isConnected, projectId]);
   
-  // Handle project update
+  // Project operations
   const handleUpdateProject = async (updatedProject: Partial<Project>) => {
-    if (!projectId) return;
+    if (!projectId || !project) return;
     
     try {
-      const response = await api.put(`/api/projects/${projectId}`, updatedProject);
-      setProject(response.data);
+      const response = await api.patch(`/api/projects/${projectId}`, updatedProject);
+      setProject({...project, ...response.data});
       setIsEditModalOpen(false);
     } catch (err) {
       console.error('Failed to update project', err);
-      throw new Error('Failed to update project. Please try again.');
     }
   };
   
-  // Handle project deletion
   const handleDeleteProject = async () => {
     if (!projectId) return;
     
     try {
       await api.delete(`/api/projects/${projectId}`);
-      navigate('/projects');
+      navigate('/projects', { replace: true });
     } catch (err) {
       console.error('Failed to delete project', err);
-      throw new Error('Failed to delete project. Please try again.');
     }
   };
   
-  // Handle phase change
-  const handlePhaseChange = async (phase: Project['phase']) => {
-    if (!projectId || !project) return;
-    
-    try {
-      await handleUpdateProject({ phase });
-    } catch (err) {
-      console.error('Failed to update project phase', err);
-      setError('Failed to update project phase. Please try again.');
-    }
-  };
-  
-  // Loading state
   if (isLoading) {
     return (
       <div className="flex justify-center items-center h-full">
@@ -155,56 +128,50 @@ const ProjectDetail = () => {
     );
   }
   
-  // Error state
-  if (!project) {
+  if (error || !project) {
     return (
-      <div className="flex flex-col items-center justify-center h-full">
-        <ExclamationCircleIcon className="h-12 w-12 text-red-500 mb-4" />
-        <h2 className="text-xl font-bold text-gray-900 mb-2">Project Not Found</h2>
-        <p className="text-gray-600 mb-4">
-          The project you're looking for doesn't exist or you don't have access to it.
-        </p>
-        <Button onClick={() => navigate('/projects')}>
-          <ArrowLeftIcon className="h-5 w-5 mr-1" />
-          Back to Projects
-        </Button>
+      <div className="text-center py-10">
+        <ExclamationCircleIcon className="h-12 w-12 text-red-500 mx-auto" />
+        <h3 className="mt-2 text-sm font-medium text-gray-900">Error</h3>
+        <p className="mt-1 text-sm text-gray-500">{error || 'Project not found'}</p>
+        <div className="mt-6">
+          <Button onClick={() => navigate('/projects')}>
+            <ArrowLeftIcon className="h-5 w-5 mr-1" />
+            Back to Projects
+          </Button>
+        </div>
       </div>
     );
   }
   
   return (
-    <div className="space-y-6">
-      {/* Header */}
-      <div className="flex items-center justify-between">
+    <div className="max-w-5xl mx-auto">
+      {/* Project Header */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between mb-6">
         <div>
           <div className="flex items-center">
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={() => navigate('/projects')}
+            <Link 
+              to="/projects" 
+              className="text-gray-500 hover:text-gray-700 mr-2"
             >
-              <ArrowLeftIcon className="h-5 w-5 mr-1" />
-              All Projects
-            </Button>
-            
-            <h1 className="text-2xl font-bold text-gray-900 ml-4">{project.title}</h1>
+              <ArrowLeftIcon className="h-5 w-5" />
+            </Link>
+            <h1 className="text-2xl font-bold text-gray-900">{project.title}</h1>
           </div>
-          
-          {project.description && (
-            <p className="mt-1 text-gray-600 ml-14">{project.description}</p>
-          )}
+          <p className="text-sm text-gray-500 mt-1">
+            Created {new Date(project.createdAt).toLocaleDateString()}
+          </p>
         </div>
         
-        <div className="flex space-x-2">
-          <Button
+        <div className="flex mt-4 sm:mt-0 space-x-2">
+          <Button 
             variant="secondary"
             onClick={() => setIsEditModalOpen(true)}
           >
             <PencilIcon className="h-5 w-5 mr-1" />
             Edit
           </Button>
-          
-          <Button
+          <Button 
             variant="danger"
             onClick={() => setIsDeleteModalOpen(true)}
           >
@@ -214,253 +181,153 @@ const ProjectDetail = () => {
         </div>
       </div>
       
-      {/* Error message */}
-      {error && (
-        <div className="bg-red-50 border-l-4 border-red-400 p-4">
-          <div className="flex">
-            <div className="flex-shrink-0">
-              <ExclamationCircleIcon className="h-5 w-5 text-red-400" />
-            </div>
-            <div className="ml-3">
-              <p className="text-sm text-red-700">{error}</p>
+      {/* Project Info */}
+      <div className="bg-white shadow rounded-lg mb-6">
+        <div className="px-4 py-5 sm:p-6">
+          <div className="prose max-w-none">
+            <h3 className="text-lg font-medium text-gray-900 mb-2">Description</h3>
+            <p className="text-gray-600">
+              {project.description || 'No description provided.'}
+            </p>
+            
+            <div className="mt-6">
+              <h3 className="text-lg font-medium text-gray-900 mb-2">Project Phase</h3>
+              <ProjectPhaseSelector 
+                currentPhase={project.phase} 
+                onPhaseChange={(phase) => handleUpdateProject({ phase })}
+              />
             </div>
           </div>
         </div>
-      )}
-      
-      {/* Phase selector */}
-      <div className="card">
-        <h2 className="text-lg font-medium text-gray-900 mb-4">Project Phase</h2>
-        <ProjectPhaseSelector
-          currentPhase={project.phase}
-          onChange={handlePhaseChange}
-        />
       </div>
       
-      {/* Feature cards */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-        {/* Scenes */}
-        <div className="card">
-          <div className="flex items-center justify-between mb-4">
-            <h2 className="text-lg font-medium text-gray-900 flex items-center">
-              <DocumentTextIcon className="h-5 w-5 mr-2 text-indigo-500" />
-              Scenes
-            </h2>
-            <Button
-              variant="primary"
-              size="sm"
-              onClick={() => navigate(`/projects/${projectId}/scenes`)}
-            >
-              <ViewBoardsIcon className="h-5 w-5 mr-1" />
-              Manage
-            </Button>
+      {/* Project Content */}
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+        <div className="md:col-span-2 space-y-6">
+          <div className="bg-white shadow rounded-lg">
+            <div className="px-4 py-5 sm:p-6">
+              <div className="flex justify-between items-center mb-4">
+                <h3 className="text-lg font-medium text-gray-900">Recent Scenes</h3>
+                <Link 
+                  to={`/projects/${projectId}/scenes`}
+                  className="text-sm text-indigo-600 hover:text-indigo-800"
+                >
+                  <div className="flex items-center">
+                    <Squares2X2Icon className="h-4 w-4 mr-1" /> {/* Using Squares2X2Icon instead of ViewBoardsIcon */}
+                    View All Scenes
+                  </div>
+                </Link>
+              </div>
+              
+              {recentScenes.length > 0 ? (
+                <div className="space-y-3">
+                  {recentScenes.map(scene => (
+                    <Link 
+                      key={scene.id}
+                      to={`/projects/${projectId}/scenes/${scene.id}`}
+                      className="block p-3 border border-gray-200 rounded-md hover:bg-gray-50"
+                    >
+                      <div className="flex justify-between items-start">
+                        <div>
+                          <h4 className="font-medium text-gray-900">{scene.title}</h4>
+                          <p className="text-sm text-gray-500 mt-1 line-clamp-2">
+                            {scene.description || 'No description'}
+                          </p>
+                        </div>
+                        <div className="text-xs text-gray-400">
+                          {new Date(scene.updatedAt).toLocaleDateString()}
+                        </div>
+                      </div>
+                    </Link>
+                  ))}
+                </div>
+              ) : (
+                <div className="text-center py-6 border border-dashed border-gray-300 rounded-md">
+                  <DocumentTextIcon className="h-10 w-10 text-gray-400 mx-auto" />
+                  <p className="mt-2 text-sm text-gray-500">No scenes created yet</p>
+                  <Link 
+                    to={`/projects/${projectId}/scenes`}
+                    className="mt-3 inline-block"
+                  >
+                    <Button size="sm">
+                      <PlusIcon className="h-4 w-4 mr-1" />
+                      Create Scene
+                    </Button>
+                  </Link>
+                </div>
+              )}
+            </div>
           </div>
           
-          {recentScenes.length > 0 ? (
-            <div className="space-y-3">
-              {recentScenes.map(scene => (
-                <div 
-                  key={scene.id}
-                  className="flex items-center p-3 border border-gray-200 rounded-md hover:border-indigo-300 hover:bg-indigo-50 transition-colors cursor-pointer"
-                  onClick={() => navigate(`/projects/${projectId}/scenes/${scene.id}`)}
-                >
-                  <div className="flex-shrink-0 mr-3 w-8 h-8 rounded-full bg-indigo-100 flex items-center justify-center text-indigo-600 font-medium">
-                    {scene.order}
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <p className="text-sm font-medium text-gray-900 truncate">
-                      {scene.title}
-                    </p>
-                    {scene.sceneType && (
-                      <p className="text-xs text-gray-500">
-                        {scene.sceneType.charAt(0).toUpperCase() + scene.sceneType.slice(1)}
-                      </p>
-                    )}
-                  </div>
-                </div>
-              ))}
-              
-              <Link
-                to={`/projects/${projectId}/scenes`}
-                className="block text-center text-sm text-indigo-600 hover:text-indigo-500 font-medium"
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
+            <div className="bg-white shadow rounded-lg p-4">
+              <Link 
+                to={`/projects/${projectId}/story`}
+                className="flex flex-col items-center p-4 text-center hover:bg-gray-50 rounded-md"
               >
-                View all scenes
+                <DocumentTextIcon className="h-10 w-10 text-indigo-500" />
+                <h3 className="mt-2 font-medium text-gray-900">Story Editor</h3>
+                <p className="text-sm text-gray-500 mt-1">
+                  Develop your story's narrative and structure
+                </p>
               </Link>
             </div>
-          ) : (
-            <div className="text-center py-6 bg-gray-50 rounded-lg">
-              <p className="text-sm text-gray-500 mb-4">No scenes created yet</p>
-              <Button
-                size="sm"
-                onClick={() => navigate(`/projects/${projectId}/scenes`)}
+            
+            <div className="bg-white shadow rounded-lg p-4">
+              <Link 
+                to={`/projects/${projectId}/objects`}
+                className="flex flex-col items-center p-4 text-center hover:bg-gray-50 rounded-md"
               >
-                <PlusIcon className="h-4 w-4 mr-1" />
-                Create First Scene
-              </Button>
-            </div>
-          )}
-        </div>
-        
-        {/* Story Objects */}
-        <div className="card">
-          <div className="flex items-center justify-between mb-4">
-            <h2 className="text-lg font-medium text-gray-900 flex items-center">
-              <CubeIcon className="h-5 w-5 mr-2 text-green-500" />
-              Story Objects
-            </h2>
-            <Button
-              variant="primary"
-              size="sm"
-              onClick={() => navigate(`/projects/${projectId}/objects`)}
-            >
-              <CubeIcon className="h-5 w-5 mr-1" />
-              Manage
-            </Button>
-          </div>
-          
-          <div className="space-y-3">
-            <div className="grid grid-cols-3 gap-3">
-              <div className="p-4 bg-indigo-50 rounded-lg text-center">
-                <UserIcon className="h-6 w-6 text-indigo-500 mx-auto mb-1" />
-                <h3 className="text-sm font-medium text-gray-900">Characters</h3>
-                <p className="text-lg font-bold text-indigo-600">
-                  {project.characterCount || 0}
+                <CubeIcon className="h-10 w-10 text-indigo-500" />
+                <h3 className="mt-2 font-medium text-gray-900">Story Objects</h3>
+                <p className="text-sm text-gray-500 mt-1">
+                  Manage characters, locations, and items
                 </p>
-              </div>
-              
-              <div className="p-4 bg-green-50 rounded-lg text-center">
-                <MapPinIcon className="h-6 w-6 text-green-500 mx-auto mb-1" />
-                <h3 className="text-sm font-medium text-gray-900">Locations</h3>
-                <p className="text-lg font-bold text-green-600">
-                  {project.locationCount || 0}
-                </p>
-              </div>
-              
-              <div className="p-4 bg-amber-50 rounded-lg text-center">
-                <CubeIcon className="h-6 w-6 text-amber-500 mx-auto mb-1" />
-                <h3 className="text-sm font-medium text-gray-900">Props</h3>
-                <p className="text-lg font-bold text-amber-600">
-                  {project.propCount || 0}
-                </p>
-              </div>
+              </Link>
             </div>
             
-            <Link
-              to={`/projects/${projectId}/objects`}
-              className="block text-center text-sm text-indigo-600 hover:text-indigo-500 font-medium"
-            >
-              Manage objects
-            </Link>
+            <div className="bg-white shadow rounded-lg p-4">
+              <Link 
+                to={`/projects/${projectId}/ai`}
+                className="flex flex-col items-center p-4 text-center hover:bg-gray-50 rounded-md"
+              >
+                <SparklesIcon className="h-10 w-10 text-indigo-500" />
+                <h3 className="mt-2 font-medium text-gray-900">AI Workshop</h3>
+                <p className="text-sm text-gray-500 mt-1">
+                  Use AI tools to enhance your story
+                </p>
+              </Link>
+            </div>
           </div>
         </div>
         
-        {/* AI Tools */}
-        <div className="card">
-          <div className="flex items-center justify-between mb-4">
-            <h2 className="text-lg font-medium text-gray-900 flex items-center">
-              <SparklesIcon className="h-5 w-5 mr-2 text-purple-500" />
-              AI Workshop
-            </h2>
-            <Button
-              variant="primary"
-              size="sm"
-              onClick={() => navigate(`/projects/${projectId}/ai`)}
-            >
-              <SparklesIcon className="h-5 w-5 mr-1" />
-              Open
-            </Button>
-          </div>
-          
-          <div className="space-y-2">
-            <button 
-              className="w-full p-3 flex items-center justify-between rounded-md hover:bg-indigo-50 transition-colors"
-              onClick={() => navigate(`/projects/${projectId}/ai?tool=structure`)}
-            >
-              <div className="flex items-center">
-                <div className="h-8 w-8 rounded-full bg-purple-100 flex items-center justify-center text-purple-600 mr-3">
-                  <SparklesIcon className="h-5 w-5" />
-                </div>
-                <div className="text-left">
-                  <h3 className="text-sm font-medium text-gray-900">Analyze Structure</h3>
-                  <p className="text-xs text-gray-500">Get feedback on story structure</p>
-                </div>
-              </div>
-            </button>
-            
-            <button 
-              className="w-full p-3 flex items-center justify-between rounded-md hover:bg-indigo-50 transition-colors"
-              onClick={() => navigate(`/projects/${projectId}/ai?tool=suggestions`)}
-            >
-              <div className="flex items-center">
-                <div className="h-8 w-8 rounded-full bg-purple-100 flex items-center justify-center text-purple-600 mr-3">
-                  <SparklesIcon className="h-5 w-5" />
-                </div>
-                <div className="text-left">
-                  <h3 className="text-sm font-medium text-gray-900">Scene Suggestions</h3>
-                  <p className="text-xs text-gray-500">Generate new scene ideas</p>
-                </div>
-              </div>
-            </button>
-            
-            <button 
-              className="w-full p-3 flex items-center justify-between rounded-md hover:bg-indigo-50 transition-colors"
-              onClick={() => navigate(`/projects/${projectId}/ai?tool=critics`)}
-            >
-              <div className="flex items-center">
-                <div className="h-8 w-8 rounded-full bg-purple-100 flex items-center justify-center text-purple-600 mr-3">
-                  <SparklesIcon className="h-5 w-5" />
-                </div>
-                <div className="text-left">
-                  <h3 className="text-sm font-medium text-gray-900">AI Critics</h3>
-                  <p className="text-xs text-gray-500">Get feedback from 8 specialist critics</p>
-                </div>
-              </div>
-            </button>
-          </div>
-        </div>
-      </div>
-      
-      {/* Collaboration section */}
-      <div className="card">
-        <div className="flex items-center justify-between mb-4">
-          <h2 className="text-lg font-medium text-gray-900 flex items-center">
-            <UserIcon className="h-5 w-5 mr-2 text-blue-500" />
-            Collaboration
-          </h2>
-          <Button
-            variant="secondary"
-            size="sm"
-            onClick={() => navigate(`/projects/${projectId}/collaborators`)}
-          >
-            <UserIcon className="h-5 w-5 mr-1" />
-            Invite
-          </Button>
-        </div>
-        
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+        <div className="space-y-6">
           <div>
-            <h3 className="text-sm font-medium text-gray-700 mb-2">Active Users</h3>
-            <div className="bg-gray-50 p-3 rounded-lg min-h-16">
-              {project.activeUsers && project.activeUsers.length > 0 ? (
-                <div className="flex flex-wrap gap-2">
-                  {project.activeUsers.map(user => (
-                    <div key={user.id} className="flex items-center text-sm">
-                      <div className="h-6 w-6 rounded-full bg-blue-500 flex items-center justify-center text-white text-xs mr-1">
-                        {user.username.charAt(0).toUpperCase()}
+            <h3 className="text-sm font-medium text-gray-700 mb-2">Contributors</h3>
+            <div className="bg-white shadow rounded-lg p-3">
+              {project.contributors && project.contributors.length > 0 ? (
+                <div className="space-y-2">
+                  {project.contributors.map((contributor, index) => (
+                    <div key={index} className="flex items-center text-sm">
+                      <div className="bg-gray-100 rounded-full p-2 mr-3">
+                        <UserIcon className="h-4 w-4 text-gray-500" />
                       </div>
-                      <span>{user.username}</span>
+                      <div>
+                        <p className="font-medium">{contributor.username}</p>
+                        <p className="text-xs text-gray-500">{contributor.role}</p>
+                      </div>
                     </div>
                   ))}
                 </div>
               ) : (
-                <p className="text-sm text-gray-500">No active users</p>
+                <p className="text-sm text-gray-500">No contributors yet</p>
               )}
             </div>
           </div>
           
           <div>
-            <h3 className="text-sm font-medium text-gray-700 mb-2">Recent Comments</h3>
-            <div className="bg-gray-50 p-3 rounded-lg min-h-16">
+            <h3 className="text-sm font-medium text-gray-700 mb-2">Comments</h3>
+            <div className="bg-white shadow rounded-lg p-3">
               {project.recentComments && project.recentComments.length > 0 ? (
                 <div className="space-y-2">
                   {project.recentComments.map(comment => (
@@ -506,7 +373,7 @@ const ProjectDetail = () => {
         isOpen={isEditModalOpen}
         onClose={() => setIsEditModalOpen(false)}
         project={project}
-        onUpdate={handleUpdateProject}
+        onSubmit={handleUpdateProject}
       />
       
       <DeleteProjectModal

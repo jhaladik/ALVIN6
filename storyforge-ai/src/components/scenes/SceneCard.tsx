@@ -4,10 +4,10 @@ import {
   UserIcon,
   MapPinIcon,
   CubeIcon,
-  MenuAlt2Icon,
-  ChatAlt2Icon,
-  BadgeCheckIcon,
-  ExclamationIcon
+  Bars2Icon, // Replacement for MenuAlt2Icon
+  ChatBubbleBottomCenterTextIcon, // Replacement for ChatAlt2Icon
+  CheckBadgeIcon, // Replacement for BadgeCheckIcon
+  ExclamationCircleIcon // Replacement for ExclamationIcon
 } from '@heroicons/react/24/outline';
 
 type SceneCardProps = {
@@ -79,16 +79,16 @@ const SceneCard = ({ scene, onClick }: SceneCardProps) => {
           
           {/* Object count */}
           <div className="flex items-center">
-            <MenuAlt2Icon className="h-3.5 w-3.5 mr-1" />
+            <Bars2Icon className="h-3.5 w-3.5 mr-1" />
             <span>{objectCount} objects</span>
           </div>
         </div>
         
         {/* AI Analysis indicator */}
         {scene.hasAnalysis ? (
-          <BadgeCheckIcon className="h-4 w-4 text-green-500" title="Has AI analysis" />
+          <CheckBadgeIcon className="h-4 w-4 text-green-500" title="Has AI analysis" />
         ) : (
-          <ExclamationIcon className="h-4 w-4 text-gray-400" title="No AI analysis" />
+          <ExclamationCircleIcon className="h-4 w-4 text-gray-400" title="No AI analysis" />
         )}
       </div>
       

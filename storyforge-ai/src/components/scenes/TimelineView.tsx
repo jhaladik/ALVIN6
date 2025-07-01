@@ -11,7 +11,7 @@ import {
   ChevronRightIcon,
   PencilIcon,
   TrashIcon,
-  DuplicateIcon,
+  DocumentDuplicateIcon, // Replacement for DuplicateIcon
   PlusIcon
 } from '@heroicons/react/24/outline';
 import Button from '../ui/Button';
@@ -108,106 +108,80 @@ const TimelineView = ({ projectId, scenes, onSceneOrderChange }: TimelineViewPro
                       ref={provided.innerRef}
                       {...provided.draggableProps}
                       className={`${
-                        snapshot.isDragging ? 'bg-indigo-50' : ''
+                        snapshot.isDragging ? 'bg-indigo-50' : 'hover:bg-gray-50'
                       }`}
                     >
-                      <div className="p-4">
-                        <div className="flex items-start">
-                          {/* Drag handle */}
-                          <div
-                            {...provided.dragHandleProps}
-                            className="flex-shrink-0 mr-3 w-6 h-6 flex items-center justify-center text-gray-400 cursor-move"
-                          >
-                            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-                              <path d="M12 8V4M12 4L9 7M12 4L15 7" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-                              <path d="M12 16V20M12 20L9 17M12 20L15 17" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-                              <path d="M20 12H16M16 12L19 9M16 12L19 15" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-                              <path d="M4 12H8M8 12L5 9M8 12L5 15" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-                            </svg>
-                          </div>
-                          
-                          {/* Scene order */}
-                          <div className="flex-shrink-0 mr-3 w-8 h-8 rounded-full bg-gray-100 flex items-center justify-center text-gray-700 font-medium text-sm">
-                            {scene.order}
-                          </div>
-                          
-                          {/* Scene content */}
-                          <div className="flex-1 min-w-0">
+                      <div
+                        {...provided.dragHandleProps}
+                        className="p-4"
+                      >
+                        <div className="flex items-center">
+                          {/* Scene info */}
+                          <div className="flex-1">
                             <div className="flex items-center">
-                              {/* Expand/collapse button */}
                               <button
                                 type="button"
                                 onClick={() => toggleExpand(scene.id)}
-                                className="mr-2 text-gray-500 hover:text-gray-700"
+                                className="text-gray-400 hover:text-gray-600 mr-2"
                               >
                                 {expandedScenes[scene.id] ? (
-                                  <ChevronDownIcon className="h-4 w-4" />
+                                  <ChevronDownIcon className="h-5 w-5" />
                                 ) : (
-                                  <ChevronRightIcon className="h-4 w-4" />
+                                  <ChevronRightIcon className="h-5 w-5" />
                                 )}
                               </button>
                               
-                              {/* Scene title */}
-                              <h3 
-                                className="text-base font-medium text-gray-900 cursor-pointer"
-                                onClick={() => navigate(`/projects/${projectId}/scenes/${scene.id}`)}
-                              >
-                                {scene.title}
-                              </h3>
-                              
-                              {/* Scene type badge */}
-                              {scene.sceneType && (
-                                <span className={`ml-2 inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${typeColors[scene.sceneType] || 'bg-gray-100 text-gray-800'}`}>
-                                  {scene.sceneType.charAt(0).toUpperCase() + scene.sceneType.slice(1)}
-                                </span>
-                              )}
-                            </div>
-                            
-                            {/* Expanded content */}
-                            {expandedScenes[scene.id] && (
-                              <div className="mt-2">
-                                {/* Scene content preview */}
-                                <div className="text-sm text-gray-500 mb-3">
-                                  {scene.content ? (
-                                    <div 
-                                      className="line-clamp-3" 
-                                      dangerouslySetInnerHTML={{ 
-                                        __html: scene.content.substring(0, 200) + (scene.content.length > 200 ? '...' : '') 
-                                      }} 
-                                    />
-                                  ) : (
-                                    <p className="italic">No content yet</p>
+                              <div>
+                                <div className="flex items-center">
+                                  <span className="font-medium text-gray-900">
+                                    {scene.title}
+                                  </span>
+                                  <span className="ml-2 px-2 py-0.5 rounded-full text-xs font-medium bg-gray-100">
+                                    #{scene.order}
+                                  </span>
+                                  {scene.sceneType && (
+                                    <span 
+                                      className={`ml-2 px-2 py-0.5 rounded-full text-xs font-medium ${
+                                        typeColors[scene.sceneType] || 'bg-gray-100 text-gray-800'
+                                      }`}
+                                    >
+                                      {scene.sceneType.charAt(0).toUpperCase() + scene.sceneType.slice(1)}
+                                    </span>
                                   )}
                                 </div>
                                 
-                                {/* Scene objects */}
-                                <div className="flex flex-wrap gap-2 mt-2">
-                                  {/* Characters */}
-                                  {scene.characters && scene.characters.length > 0 && (
-                                    <div className="inline-flex items-center px-2 py-1 rounded-md bg-indigo-50 text-indigo-700 text-xs">
-                                      <UserIcon className="h-3.5 w-3.5 mr-1" />
-                                      {scene.characters.length} characters
+                                {expandedScenes[scene.id] && (
+                                  <div className="mt-2">
+                                    <p className="text-sm text-gray-500">
+                                      {scene.description || 'No description provided.'}
+                                    </p>
+                                    
+                                    <div className="mt-2 flex flex-wrap gap-2">
+                                      {scene.characters && scene.characters.length > 0 && (
+                                        <div className="inline-flex items-center px-2 py-1 rounded-md bg-indigo-50 text-indigo-700 text-xs">
+                                          <UserIcon className="h-3.5 w-3.5 mr-1" />
+                                          {scene.characters.length} characters
+                                        </div>
+                                      )}
+                                      
+                                      {scene.locations && scene.locations.length > 0 && (
+                                        <div className="inline-flex items-center px-2 py-1 rounded-md bg-green-50 text-green-700 text-xs">
+                                          <MapPinIcon className="h-3.5 w-3.5 mr-1" />
+                                          {scene.locations.length} locations
+                                        </div>
+                                      )}
+                                      
+                                      {scene.props && scene.props.length > 0 && (
+                                        <div className="inline-flex items-center px-2 py-1 rounded-md bg-amber-50 text-amber-700 text-xs">
+                                          <CubeIcon className="h-3.5 w-3.5 mr-1" />
+                                          {scene.props.length} props
+                                        </div>
+                                      )}
                                     </div>
-                                  )}
-                                  
-                                  {/* Locations */}
-                                  {scene.locations && scene.locations.length > 0 && (
-                                    <div className="inline-flex items-center px-2 py-1 rounded-md bg-green-50 text-green-700 text-xs">
-                                      <MapPinIcon className="h-3.5 w-3.5 mr-1" />
-                                      {scene.locations.length} locations
-                                    </div>
-                                  )}
-                                  
-                                  {/* Props */}
-                                  {scene.props && scene.props.length > 0 && (
-                                    <div className="inline-flex items-center px-2 py-1 rounded-md bg-amber-50 text-amber-700 text-xs">
-                                      <CubeIcon className="h-3.5 w-3.5 mr-1" />
-                                      {scene.props.length} props
-                                    </div>
-                                  )}
-                                </div>
+                                  </div>
+                                )}
                               </div>
-                            )}
+                            </div>
                           </div>
                           
                           {/* Actions */}
@@ -226,7 +200,7 @@ const TimelineView = ({ projectId, scenes, onSceneOrderChange }: TimelineViewPro
                               className="text-gray-400 hover:text-indigo-600"
                               title="Duplicate scene"
                             >
-                              <DuplicateIcon className="h-5 w-5" />
+                              <DocumentDuplicateIcon className="h-5 w-5" />
                             </button>
                             <button
                               type="button"

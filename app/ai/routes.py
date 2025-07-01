@@ -10,7 +10,7 @@ from app import db
 import time
 
 @ai_bp.route('/analyze-idea', methods=['POST'])
-@login_required
+@token_required
 @track_ai_operation('analyze_idea')
 def analyze_idea():
     """Analyze free-form idea text and extract structure"""
@@ -49,7 +49,7 @@ def analyze_idea():
         return jsonify({'error': f'Idea analysis failed: {str(e)}'}), 500
 
 @ai_bp.route('/create-project-from-idea', methods=['POST'])
-@login_required
+@token_required
 @track_ai_operation('create_project_from_idea')
 def create_project_from_idea():
     """Create project and first scene from analyzed idea"""
@@ -158,7 +158,7 @@ def create_project_from_idea():
         return jsonify({'error': f'Project creation failed: {str(e)}'}), 500
 
 @ai_bp.route('/projects/<project_id>/analyze-structure', methods=['POST'])
-@login_required
+@token_required
 @track_ai_operation('analyze_structure')
 def analyze_structure(project_id):
     """Analyze story structure with comprehensive AI critics"""
@@ -206,7 +206,7 @@ def analyze_structure(project_id):
         return jsonify({'error': f'AI analysis failed: {str(e)}'}), 500
 
 @ai_bp.route('/projects/<project_id>/enhanced-critics', methods=['POST'])
-@login_required
+@token_required
 @track_ai_operation('enhanced_critics')
 def get_enhanced_critics(project_id):
     """Get feedback from enhanced AI critics system"""
@@ -247,7 +247,7 @@ def get_enhanced_critics(project_id):
         return jsonify({'error': f'Enhanced critics analysis failed: {str(e)}'}), 500
 
 @ai_bp.route('/projects/<project_id>/critics/<critic_type>', methods=['POST'])
-@login_required
+@token_required
 def get_specific_critic(project_id, critic_type):
     """Get feedback from specific AI critic"""
     
@@ -330,7 +330,7 @@ def get_specific_critic(project_id, critic_type):
         return jsonify({'error': f'{critic_type} analysis failed: {str(e)}'}), 500
 
 @ai_bp.route('/projects/<project_id>/suggest-scenes', methods=['POST'])
-@login_required
+@token_required
 @track_ai_operation('suggest_scenes')
 def suggest_scenes(project_id):
     """AI scene suggestions with enhanced context"""
@@ -376,7 +376,7 @@ def suggest_scenes(project_id):
         return jsonify({'error': f'AI suggestion failed: {str(e)}'}), 500
 
 @ai_bp.route('/projects/<project_id>/generate-story', methods=['POST'])
-@login_required
+@token_required
 @track_ai_operation('generate_story')
 def generate_story(project_id):
     """Generate complete story from scenes"""
@@ -429,7 +429,7 @@ def generate_story(project_id):
         return jsonify({'error': f'Story generation failed: {str(e)}'}), 500
 
 @ai_bp.route('/token-estimate', methods=['POST'])
-@login_required
+@token_required
 def get_token_estimate():
     """Get token cost estimate for AI operation"""
     data = request.get_json()
@@ -457,7 +457,7 @@ def get_token_estimate():
         return jsonify({'error': f'Estimate calculation failed: {str(e)}'}), 500
 
 @ai_bp.route('/usage-analytics', methods=['GET'])
-@login_required
+@token_required
 def get_ai_usage_analytics():
     """Get AI usage analytics for current user"""
     user_id = session['user_id']
